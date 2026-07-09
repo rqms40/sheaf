@@ -243,17 +243,42 @@ export function FindingsPage() {
       if (!selected) throw new Error("No finding");
       return api.restoreFindingRevision(engagementId, selected.id, revisionId);
     },
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       const next = toDraft(res.data);
+      setSelectedId(res.data.id);
       setDraft(next);
       setSavedSnapshot(next);
-      toast.success("Version restored (new revision appended)");
-      invalidate();
-      qc.invalidateQueries({
+      // Patch list cache so selection shows restored fields immediately
+      qc.setQueriesData<{ data: Finding[] }>(
+        { queryKey: ["findings", engagementId] },
+        (old) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((f) => (f.id === res.data.id ? res.data : f)),
+          };
+        },
+      );
+      // Restored status may hide the finding from the active list
+      if (res.data.status === "archived" && visibility === "active") {
+        setVisibility("all");
+      }
+      toast.success("Version restored");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["findings", engagementId] }),
+        qc.invalidateQueries({
+          queryKey: ["finding-history", engagementId, res.data.id],
+        }),
+        qc.invalidateQueries({ queryKey: ["timeline", engagementId] }),
+      ]);
+      await qc.refetchQueries({
         queryKey: ["finding-history", engagementId, res.data.id],
       });
+      // Re-assert draft so list invalidation cannot clobber restored form
+      setDraft(next);
+      setSavedSnapshot(next);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message || "Restore failed"),
   });
 
   const createManual = useMutation({
@@ -1015,16 +1040,20 @@ export function FindingsPage() {
               </TabsContent>
 
               <TabsContent value="history" className="space-y-3">
+                {historyQuery.isError ? (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">
+                    Could not load history: {(historyQuery.error as Error).message}
+                  </div>
+                ) : null}
                 <FindingHistory
                   revisions={historyQuery.data?.data ?? []}
-                  loading={historyQuery.isLoading}
-                  restoringId={restoreMut.isPending ? restoreMut.variables : null}
-                  dirty={dirty}
+                  loading={historyQuery.isLoading || historyQuery.isFetching}
+                  restoringId={
+                    restoreMut.isPending
+                      ? (restoreMut.variables as string | undefined) ?? null
+                      : null
+                  }
                   onRestore={(revisionId) => {
-                    if (dirty) {
-                      toast.message("Save or discard changes before restoring");
-                      return;
-                    }
                     restoreMut.mutate(revisionId);
                   }}
                 />

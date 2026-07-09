@@ -177,6 +177,16 @@ test.describe("Sheaf Engagement OS", () => {
     body = await hist.json();
     expect(body.data.length).toBe(3);
     expect(body.data[0].source).toBe("restore");
+
+    // Confirm finding body actually restored (not only history row)
+    const got = await request.get(
+      `/api/engagements/${eng.id}/findings/${finding.id}`,
+    );
+    const gotBody = await got.json();
+    expect(gotBody.data.title).toBe("Open redirect");
+    expect(gotBody.data.description).toBe("v1 body");
+    expect(gotBody.data.severity).toBe("low");
+    expect(gotBody.data.status).toBe("draft");
   });
 
   test("legacy finding first edit seeds baseline; evidence upload preview delete", async ({

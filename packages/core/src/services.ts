@@ -369,6 +369,7 @@ export function listFindingHistory(ws: Workspace, engagementId: string, findingI
 /**
  * Restore a prior snapshot as a new edit (Word-style "restore version").
  * Appends a new revision; does not rewrite history.
+ * Applies the full snapshot atomically (does not use partial-update ambiguity).
  */
 export function restoreFindingRevision(
   ws: Workspace,
@@ -378,26 +379,89 @@ export function restoreFindingRevision(
 ) {
   const rev = getFindingRevision(ws, engagementId, findingId, revisionId);
   if (!rev) return null;
+  const existing = getFinding(ws, engagementId, findingId);
+  if (!existing) return null;
+
   const snap = rev.snapshot;
-  return updateFinding(
+  const before = snapshotFromFinding(existing);
+
+  const sevRaw = String(snap.severity || existing.severity).toLowerCase();
+  const sevParsed: Severity = (
+    ["critical", "high", "medium", "low", "info"] as const
+  ).includes(sevRaw as Severity)
+    ? (sevRaw as Severity)
+    : (existing.severity as Severity);
+
+  const statusRaw = String(snap.status || existing.status);
+  const statusParsed: FindingStatus = (
+    [
+      "draft",
+      "needs_review",
+      "confirmed",
+      "false_positive",
+      "risk_accepted",
+      "remediated",
+      "archived",
+    ] as const
+  ).includes(statusRaw as FindingStatus)
+    ? (statusRaw as FindingStatus)
+    : (existing.status as FindingStatus);
+
+  const title = (snap.title && String(snap.title).trim()) || existing.title;
+  const refs = Array.isArray(snap.references) ? snap.references.map(String) : [];
+
+  ws.db
+    .update(schema.findings)
+    .set({
+      title,
+      severity: sevParsed,
+      status: statusParsed,
+      host: snap.host ?? null,
+      path: snap.path ?? null,
+      description: snap.description ?? null,
+      impact: snap.impact ?? null,
+      remediation: snap.remediation ?? null,
+      cwe: snap.cwe ?? null,
+      cve: snap.cve ?? null,
+      referencesJson: JSON.stringify(refs),
+      updatedAt: nowMs(),
+    })
+    .where(
+      and(eq(schema.findings.id, findingId), eq(schema.findings.engagementId, engagementId)),
+    )
+    .run();
+
+  if (statusParsed !== existing.status) {
+    addTimeline(
+      ws,
+      engagementId,
+      "status_change",
+      `Finding restored: status ${existing.status} → ${statusParsed}: ${title}`,
+      "finding",
+      findingId,
+    );
+  } else {
+    addTimeline(
+      ws,
+      engagementId,
+      "other",
+      `Finding restored to revision ${rev.revision}: ${title}`,
+      "finding",
+      findingId,
+    );
+  }
+
+  const updated = getFinding(ws, engagementId, findingId)!;
+  recordFindingRevision(
     ws,
     engagementId,
     findingId,
-    {
-      title: snap.title,
-      severity: snap.severity as Severity,
-      status: snap.status as FindingStatus,
-      host: snap.host,
-      path: snap.path,
-      description: snap.description,
-      impact: snap.impact,
-      remediation: snap.remediation,
-      cwe: snap.cwe,
-      cve: snap.cve,
-      references: snap.references,
-    },
-    { source: "restore" },
+    "restore",
+    before,
+    snapshotFromFinding(updated),
   );
+  touchEngagement(ws, engagementId);
+  return updated;
 }
 
 export function listRuns(ws: Workspace, engagementId: string) {

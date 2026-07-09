@@ -45,6 +45,7 @@ type Props = {
   revisions: FindingRevision[];
   loading?: boolean;
   restoringId?: string | null;
+  /** @deprecated dirty no longer blocks restore — kept for callers */
   dirty?: boolean;
   onRestore: (revisionId: string) => void;
 };
@@ -57,7 +58,6 @@ export function FindingHistory({
   revisions,
   loading,
   restoringId,
-  dirty,
   onRestore,
 }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -90,11 +90,9 @@ export function FindingHistory({
             {revisions.length} revision{revisions.length === 1 ? "" : "s"} · append-only ledger
           </p>
         </div>
-        {dirty ? (
-          <p className="max-w-[14rem] text-right text-[11px] text-high">
-            Save or discard unsaved edits before restoring.
-          </p>
-        ) : null}
+        <p className="max-w-[16rem] text-right text-[11px] text-faint">
+          Restore reapplies that snapshot and appends a new revision.
+        </p>
       </div>
 
       <ol className="history-ledger relative m-0 list-none space-y-0 p-0">
@@ -215,15 +213,22 @@ export function FindingHistory({
 
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
                       <p className="max-w-sm text-[11px] text-faint">
-                        Restoring applies this snapshot as a new revision — earlier
-                        history is kept.
+                        {isLatest
+                          ? "This is already the current version."
+                          : "Restoring discards unsaved form edits and appends a new revision."}
                       </p>
                       <Button
+                        type="button"
                         size="sm"
                         variant="secondary"
-                        disabled={isLatest || dirty || restoringId === rev.id}
-                        onClick={() => onRestore(rev.id)}
+                        disabled={isLatest || restoringId === rev.id}
                         data-testid="restore-revision"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (isLatest) return;
+                          onRestore(rev.id);
+                        }}
                       >
                         <RotateCcw className="size-3.5" />
                         {restoringId === rev.id ? "Restoring…" : "Restore version"}
