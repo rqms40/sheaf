@@ -29,6 +29,8 @@ Most tools are either scanners or report writers. Sheaf sits in the middle as a 
 
 No cloud. No multi-tenant SaaS. Workspace lives under `./.sheaf/` (SQLite + evidence files).
 
+**What’s next:** research-backed backlog in [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/next-features-research.md](docs/next-features-research.md); open work lives in [GitHub Issues](https://github.com/rqms40/sheaf/issues).
+
 ## Features
 
 | Area | What you get |

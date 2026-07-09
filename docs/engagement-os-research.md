@@ -278,3 +278,23 @@ Filters: e.g. `--confirmed-only` for client drafts; internal exports may include
 - Sheaf ADRs: local SQLite workspace, loopback bind, import-first, Markdown-then-DOCX (`PLANNING.md`, `PRD.md`)
 
 _Update when import formats, console threat model, or competitor lifecycle features change positioning._
+
+---
+
+## 8. 2026 follow-on research (next features)
+
+A second research pass (surveys + practitioner sources, not guesswork) prioritizes the post-core backlog:
+
+- **Doc:** [next-features-research.md](./next-features-research.md)  
+- **Living board:** [ROADMAP.md](./ROADMAP.md) + GitHub issues (`priority:p0` / `p1` / `p2`)
+
+Headline evidence used for prioritization:
+
+| Source | Signal |
+|--------|--------|
+| Core Security / Fortra 2024 pen-test survey | Reporting, multi-vector coverage, automation of busywork as top evaluation criteria for tools |
+| Pentera State of Pentesting 2025 | Tool sprawl / need to focus on exploitable risk; continuous validation mindset |
+| HackerOne HPSR 2025 | ~70% researchers use AI in workflow; reproducible proof still required |
+| SANS / HTB / Bright report guidance | Write-as-you-go; draft quality dominates report effort; retest is real lifecycle |
+
+**P0 wedge when returning:** Assets UI → editable report sections → scope guards → retest → CVSS → deeper proxy evidence.
