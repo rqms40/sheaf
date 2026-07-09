@@ -1,0 +1,32 @@
+{
+  "name": "@sheaf/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.9.1",
+    "docx": "^9.5.1",
+    "drizzle-orm": "^0.44.2",
+    "fast-xml-parser": "^5.2.5",
+    "ulid": "^3.0.1",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.15.32",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

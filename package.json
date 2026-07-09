@@ -1,0 +1,20 @@
+{
+  "name": "sheaf",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local-first engagement casefile for offensive security",
+  "packageManager": "pnpm@11.10.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @sheaf/api --filter @sheaf/web dev",
+    "dev:api": "pnpm --filter @sheaf/api dev",
+    "dev:web": "pnpm --filter @sheaf/web dev",
+    "build": "pnpm --filter @sheaf/core build && pnpm --filter @sheaf/web build",
+    "test": "pnpm --filter @sheaf/core test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "ci": "pnpm test && pnpm typecheck && pnpm build",
+    "sheaf": "pnpm --filter @sheaf/cli start"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

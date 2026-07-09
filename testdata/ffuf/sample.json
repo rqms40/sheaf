@@ -1,0 +1,19 @@
+{
+  "results": [
+    {
+      "url": "https://shop.lab.local/admin/",
+      "status": 200,
+      "length": 2400,
+      "words": 120,
+      "lines": 40,
+      "content_type": "text/html",
+      "host": "shop.lab.local"
+    },
+    {
+      "url": "https://shop.lab.local/.git/config",
+      "status": 403,
+      "length": 150,
+      "host": "shop.lab.local"
+    }
+  ]
+}

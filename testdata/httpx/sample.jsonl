@@ -1,0 +1,2 @@
+{"url":"https://shop.lab.local","host":"shop.lab.local","status_code":200,"title":"Demo Shop","tech":["nginx"]}
+{"url":"https://api.lab.local/health","status_code":200,"title":"ok"}
