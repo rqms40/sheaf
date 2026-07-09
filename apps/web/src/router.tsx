@@ -29,6 +29,13 @@ const indexRoute = createRoute({
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
+  validateSearch: (search: Record<string, unknown>): { returnTo?: string } => {
+    const raw = search.returnTo;
+    if (typeof raw !== "string" || !raw.startsWith("/e/")) return {};
+    // only allow in-app engagement paths
+    if (!/^\/e\/[^/]+(\/.*)?$/.test(raw)) return {};
+    return { returnTo: raw };
+  },
   component: SettingsPage,
 });
 

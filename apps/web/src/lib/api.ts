@@ -94,6 +94,7 @@ export type SheafSettings = {
   autoImportOnWrap: boolean;
   consoleCwd: "workspace" | "engagement";
   uiDensity: "comfortable" | "compact";
+  uiLayout: "rail" | "sidebar";
 };
 
 export type FindingRevision = {

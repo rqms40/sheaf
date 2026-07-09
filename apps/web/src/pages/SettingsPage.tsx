@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { Check, ChevronDown, CircleHelp, Settings2 } from "lucide-react";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { Link, useNavigate, useRouter, useSearch } from "@tanstack/react-router";
+import { ArrowLeft, Check, ChevronDown, CircleHelp, Settings2 } from "lucide-react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/sheaf/PageHeader";
 import { SheafMark } from "@/components/sheaf/Logo";
@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { resolveSettingsBackPath } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
 /**
@@ -80,6 +81,9 @@ function HelpList({ items }: { items: string[] }) {
  */
 export function SettingsPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const router = useRouter();
+  const search = useSearch({ from: "/settings" });
   const settingsQ = useQuery({
     queryKey: ["settings"],
     queryFn: () => api.getSettings(),
@@ -93,6 +97,7 @@ export function SettingsPage() {
   const [confirmedOnly, setConfirmedOnly] = useState(false);
   const [autoImport, setAutoImport] = useState(true);
   const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
+  const [layout, setLayout] = useState<"rail" | "sidebar">("rail");
   const [consoleCwd, setConsoleCwd] = useState<"workspace" | "engagement">("workspace");
 
   useEffect(() => {
@@ -102,6 +107,7 @@ export function SettingsPage() {
     setConfirmedOnly(s.reportConfirmedOnly);
     setAutoImport(s.autoImportOnWrap);
     setDensity(s.uiDensity === "compact" ? "compact" : "comfortable");
+    setLayout(s.uiLayout === "sidebar" ? "sidebar" : "rail");
     setConsoleCwd(s.consoleCwd === "engagement" ? "engagement" : "workspace");
   }, [settingsQ.data?.data]);
 
@@ -112,12 +118,14 @@ export function SettingsPage() {
         reportConfirmedOnly: confirmedOnly,
         autoImportOnWrap: autoImport,
         uiDensity: density,
+        uiLayout: layout,
         consoleCwd,
       }),
     onSuccess: () => {
       toast.success("Settings saved");
       qc.invalidateQueries({ queryKey: ["settings"] });
       document.documentElement.dataset.density = density;
+      document.documentElement.dataset.layout = layout;
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -126,21 +134,58 @@ export function SettingsPage() {
     if (settingsQ.data?.data?.uiDensity) {
       document.documentElement.dataset.density = settingsQ.data.data.uiDensity;
     }
-  }, [settingsQ.data?.data?.uiDensity]);
+    if (settingsQ.data?.data?.uiLayout) {
+      document.documentElement.dataset.layout = settingsQ.data.data.uiLayout;
+    }
+  }, [settingsQ.data?.data?.uiDensity, settingsQ.data?.data?.uiLayout]);
 
   const engagements = engagementsQ.data?.data ?? [];
   const activeName =
     engagements.find((e) => e.id === activeId)?.name ||
     (activeId ? activeId.slice(0, 10) : "None");
 
+  const backPath = useMemo(
+    () =>
+      resolveSettingsBackPath(
+        search.returnTo,
+        activeId || settingsQ.data?.data?.activeEngagementId,
+      ),
+    [search.returnTo, activeId, settingsQ.data?.data?.activeEngagementId],
+  );
+  const backIsCase = backPath.startsWith("/e/");
+  const backLabel = backIsCase ? "Back to case" : "Back to home";
+
+  const goBack = () => {
+    if (backPath === "/") {
+      navigate({ to: "/" });
+      return;
+    }
+    // Arbitrary engagement subpath (findings, scope, …) — history push keeps typing simple
+    router.history.push(backPath);
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-card/95 px-3 py-2 sm:px-5">
-        <Link to="/" className="flex items-center gap-2 rounded-md hover:opacity-90">
-          <SheafMark className="size-7" />
-          <span className="text-[13px] font-medium tracking-[0.04em]">Sheaf</span>
-        </Link>
-        <span className="text-[12px] text-muted">Workspace preferences</span>
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0 text-muted hover:text-foreground"
+            onClick={goBack}
+            title={backLabel}
+            aria-label={backLabel}
+            data-testid="settings-back"
+          >
+            <ArrowLeft className="size-4" />
+          </Button>
+          <Link to="/" className="flex min-w-0 items-center gap-2 rounded-md hover:opacity-90">
+            <SheafMark className="size-7 shrink-0" />
+            <span className="text-[13px] font-medium tracking-[0.04em]">Sheaf</span>
+          </Link>
+        </div>
+        <span className="hidden text-[12px] text-muted sm:inline">Workspace preferences</span>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 pb-16 sm:px-6 lg:px-10">
@@ -317,34 +362,69 @@ export function SettingsPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-[13px]">Interface</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="space-y-1.5">
-                <Label>Density</Label>
-                <Select
-                  value={density}
-                  onValueChange={(v) =>
-                    setDensity(v === "compact" ? "compact" : "comfortable")
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="comfortable">Comfortable</SelectItem>
-                    <SelectItem value="compact">Compact</SelectItem>
-                  </SelectContent>
-                </Select>
+            <CardContent className="space-y-5">
+              <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <Label>Layout</Label>
+                  <Select
+                    value={layout}
+                    onValueChange={(v) => setLayout(v === "sidebar" ? "sidebar" : "rail")}
+                  >
+                    <SelectTrigger data-testid="settings-layout">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rail">Top rail (default)</SelectItem>
+                      <SelectItem value="sidebar">Left sidebar (collapsible)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <SettingHelp>
+                  <p>
+                    How engagement pages are framed. Same palette and components either way —
+                    only the chrome moves.
+                  </p>
+                  <HelpList
+                    items={[
+                      "Top rail → compact header with all page icons (default look you already like)",
+                      "Left sidebar → collapsible case rail; expanded lists every page by group",
+                      "Collapsed sidebar → only Casework / Ops / Deliver icons; click a group to open its pages",
+                      "Density: Compact on top rail also switches header to those 3 group menus",
+                      "Mobile still uses bottom primary tabs + hamburger",
+                    ]}
+                  />
+                </SettingHelp>
               </div>
-              <SettingHelp>
-                <p>UI spacing preference for this workspace.</p>
-                <HelpList
-                  items={[
-                    "Comfortable → default type size and breathing room",
-                    "Compact → slightly denser text for smaller screens or long finding lists",
-                    "Applies after Save (sets data-density on the page)",
-                  ]}
-                />
-              </SettingHelp>
+
+              <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <Label>Density</Label>
+                  <Select
+                    value={density}
+                    onValueChange={(v) =>
+                      setDensity(v === "compact" ? "compact" : "comfortable")
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="comfortable">Comfortable</SelectItem>
+                      <SelectItem value="compact">Compact</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <SettingHelp>
+                  <p>UI spacing preference for this workspace.</p>
+                  <HelpList
+                    items={[
+                      "Comfortable → default type size; top rail shows every page icon",
+                      "Compact → denser text, and on Top rail: Casework / Ops / Deliver menus (fewer chrome items)",
+                      "Applies after Save (sets data-density on the page)",
+                    ]}
+                  />
+                </SettingHelp>
+              </div>
             </CardContent>
           </Card>
 

@@ -21,6 +21,12 @@ export const SheafSettingsSchema = z.object({
   consoleCwd: z.enum(["workspace", "engagement"]).default("workspace"),
   /** Compact UI density (web) */
   uiDensity: z.enum(["comfortable", "compact"]).default("comfortable"),
+  /**
+   * App chrome layout (web).
+   * - rail: current compact top nav (default — unchanged look)
+   * - sidebar: left case-room rail with full labels (easier discoverability)
+   */
+  uiLayout: z.enum(["rail", "sidebar"]).default("rail"),
 });
 
 export type SheafSettings = z.infer<typeof SheafSettingsSchema>;
@@ -66,6 +72,7 @@ export function getSettings(ws: Workspace): SheafSettings {
     autoImportOnWrap: raw.autoImportOnWrap ?? true,
     consoleCwd: raw.consoleCwd === "engagement" ? "engagement" : "workspace",
     uiDensity: raw.uiDensity === "compact" ? "compact" : "comfortable",
+    uiLayout: raw.uiLayout === "sidebar" ? "sidebar" : "rail",
   });
 }
 
