@@ -42,7 +42,9 @@ export type FindingRevisionSource =
   | "import"
   | "archive"
   | "restore"
-  | "status";
+  | "status"
+  /** First tracked snapshot for findings that pre-date history (or imports). */
+  | "baseline";
 
 export type FindingRevision = {
   id: string;
@@ -120,6 +122,7 @@ export function summarizeChanges(
 ): string {
   const keys = Object.keys(changes) as RevisionField[];
   if (source === "create") return "Finding created";
+  if (source === "baseline") return "Prior version (before tracked history)";
   if (source === "restore") return "Restored from earlier revision";
   if (source === "archive") return "Archived";
   if (keys.length === 0) return "Saved (no field changes)";
@@ -182,9 +185,48 @@ function nextRevisionNumber(ws: Workspace, findingId: string): number {
   return (row?.m ?? 0) + 1;
 }
 
+function insertRevisionRow(
+  ws: Workspace,
+  engagementId: string,
+  findingId: string,
+  revision: number,
+  source: FindingRevisionSource,
+  summary: string,
+  snapshot: FindingSnapshot,
+  changes: Partial<Record<RevisionField, FieldChange>>,
+  createdAt = nowMs(),
+): FindingRevision {
+  const id = newId();
+  ws.db
+    .insert(schema.findingRevisions)
+    .values({
+      id,
+      engagementId,
+      findingId,
+      revision,
+      source,
+      summary,
+      snapshotJson: JSON.stringify(snapshot),
+      changesJson: JSON.stringify(changes),
+      createdAt,
+    })
+    .run();
+  return mapRevision(
+    ws.db
+      .select()
+      .from(schema.findingRevisions)
+      .where(eq(schema.findingRevisions.id, id))
+      .get()!,
+  );
+}
+
 /**
  * Append a revision if there are real field changes (or source is create/restore/archive).
  * Returns the revision or null if nothing to record.
+ *
+ * For findings that never had history (imports / pre-history rows), the first
+ * tracked edit also writes a baseline snapshot of the previous state so the
+ * History tab is never empty after a successful save.
  */
 export function recordFindingRevision(
   ws: Workspace,
@@ -206,32 +248,35 @@ export function recordFindingRevision(
     src = after.status === "archived" ? "archive" : "status";
   }
 
-  const revision = nextRevisionNumber(ws, findingId);
-  const id = newId();
-  const now = nowMs();
-  const summary = summarizeChanges(src, changes);
+  let revision = nextRevisionNumber(ws, findingId);
 
-  ws.db
-    .insert(schema.findingRevisions)
-    .values({
-      id,
+  // Seed baseline so older/imported findings show a "before" version on first edit
+  if (revision === 1 && before && src !== "create" && src !== "baseline") {
+    insertRevisionRow(
+      ws,
       engagementId,
       findingId,
-      revision,
-      source: src,
-      summary,
-      snapshotJson: JSON.stringify(after),
-      changesJson: JSON.stringify(changes),
-      createdAt: now,
-    })
-    .run();
+      1,
+      "baseline",
+      "Prior version (before tracked history)",
+      before,
+      {},
+      // slightly earlier so order is stable if times collide
+      nowMs() - 1,
+    );
+    revision = 2;
+  }
 
-  return mapRevision(
-    ws.db
-      .select()
-      .from(schema.findingRevisions)
-      .where(eq(schema.findingRevisions.id, id))
-      .get()!,
+  const summary = summarizeChanges(src, changes);
+  return insertRevisionRow(
+    ws,
+    engagementId,
+    findingId,
+    revision,
+    src,
+    summary,
+    after,
+    changes,
   );
 }
 

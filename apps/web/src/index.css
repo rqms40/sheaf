@@ -203,6 +203,17 @@ body::before {
   color: inherit;
   font-size: inherit;
 }
+.paper-surface img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.5rem 0 1rem;
+  border: 1px solid color-mix(in oklab, var(--color-paper-ink) 14%, transparent);
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  page-break-inside: avoid;
+}
 
 /* Finding revision ledger — casefile spine */
 .history-ledger-item:last-child .history-ledger-spine {

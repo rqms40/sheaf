@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { bodyLimit } from "hono/body-limit";
+import fs from "node:fs";
 import type { Workspace } from "@sheaf/core";
 import {
   addEvidence,
@@ -13,9 +14,11 @@ import {
   buildReport,
   createEngagement,
   createFinding,
+  deleteEvidence,
   deleteFinding,
   deleteScope,
   getEngagement,
+  getEvidence,
   getFinding,
   getFindingTemplate,
   importBurp,
@@ -35,6 +38,7 @@ import {
   listScope,
   listTimeline,
   probeFinding,
+  resolveEvidenceFile,
   restoreFindingRevision,
   runToolAndImport,
   saveEvidenceFile,
@@ -260,6 +264,40 @@ export function createApp(getWorkspace: () => Workspace) {
     return c.json({ data: listEvidence(c.get("workspace"), c.req.param("id"), findingId) });
   });
 
+  app.get("/api/engagements/:id/evidence/:eid", (c) => {
+    const row = getEvidence(c.get("workspace"), c.req.param("id"), c.req.param("eid"));
+    if (!row) return jsonError(c, 404, "not_found", "Evidence not found");
+    return c.json({ data: row });
+  });
+
+  app.get("/api/engagements/:id/evidence/:eid/file", (c) => {
+    const file = resolveEvidenceFile(
+      c.get("workspace"),
+      c.req.param("id"),
+      c.req.param("eid"),
+    );
+    if (!file) return jsonError(c, 404, "not_found", "Evidence file not found");
+    try {
+      const bytes = fs.readFileSync(file.abs);
+      return new Response(bytes, {
+        status: 200,
+        headers: {
+          "Content-Type": file.mime,
+          "Content-Disposition": `inline; filename="${file.filename.replace(/"/g, "")}"`,
+          "Cache-Control": "private, max-age=60",
+        },
+      });
+    } catch (e) {
+      return jsonError(c, 500, "read_error", e instanceof Error ? e.message : "read failed");
+    }
+  });
+
+  app.delete("/api/engagements/:id/evidence/:eid", (c) => {
+    const ok = deleteEvidence(c.get("workspace"), c.req.param("id"), c.req.param("eid"));
+    if (!ok) return jsonError(c, 404, "not_found", "Evidence not found");
+    return c.json({ ok: true });
+  });
+
   app.post("/api/engagements/:id/evidence", async (c) => {
     const body = await c.req.json();
     const parsed = CreateEvidenceInput.safeParse(body);
@@ -389,11 +427,22 @@ export function createApp(getWorkspace: () => Workspace) {
       if (!b64) return jsonError(c, 400, "validation_error", "contentBase64 required");
       try {
         const bytes = Buffer.from(b64, "base64");
+        const kindRaw = body.kind ? String(body.kind) : undefined;
+        const kind =
+          kindRaw === "screenshot" ||
+          kindRaw === "file" ||
+          kindRaw === "http" ||
+          kindRaw === "other"
+            ? kindRaw
+            : undefined;
         const row = saveEvidenceFile(c.get("workspace"), c.req.param("id"), {
           findingId,
           filename,
           bytes,
-          kind: body.kind,
+          kind,
+          meta: {
+            mimeType: body.mimeType ? String(body.mimeType) : undefined,
+          },
         });
         return c.json({ data: row }, 201);
       } catch (e) {

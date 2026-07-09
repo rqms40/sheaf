@@ -30,6 +30,7 @@ describe("finding revisions", () => {
 
   it("summarizes create and multi-field edit", () => {
     expect(summarizeChanges("create", {})).toBe("Finding created");
+    expect(summarizeChanges("baseline", {})).toContain("Prior version");
     const summary = summarizeChanges("edit", {
       status: { from: "draft", to: "confirmed" },
       severity: { from: "low", to: "high" },

@@ -26,8 +26,13 @@ marked.setOptions({
 
 function renderReportHtml(markdown: string): string {
   const raw = marked.parse(markdown, { async: false }) as string;
+  // Allow data:image/* so evidence screenshots embed in the paper preview
   return DOMPurify.sanitize(raw, {
     USE_PROFILES: { html: true },
+    ADD_TAGS: ["img"],
+    ADD_ATTR: ["src", "alt", "title", "width", "height", "loading"],
+    ALLOWED_URI_REGEXP:
+      /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
   });
 }
 

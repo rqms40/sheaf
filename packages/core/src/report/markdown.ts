@@ -39,6 +39,11 @@ type Evidence = {
   findingId: string | null;
   kind: string;
   contentText?: string | null;
+  path?: string | null;
+  meta?: Record<string, unknown>;
+  /** When set, Markdown embeds the screenshot as a data-URI image */
+  imageDataUri?: string | null;
+  imageFilename?: string | null;
 };
 
 type Asset = {
@@ -70,6 +75,10 @@ function slugify(s: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 48);
+}
+
+function escapeMdAlt(s: string): string {
+  return s.replace(/[[\]]/g, "");
 }
 
 function severityLabel(s: string): string {
@@ -354,15 +363,30 @@ export function renderMarkdownReport(input: {
       if (ev.length) {
         lines.push("#### Evidence");
         lines.push("");
-        lines.push(`Attached evidence items: **${ev.length}**.`);
-        lines.push("");
+        let imageN = 0;
         for (const e of ev) {
-          lines.push(`- \`${e.id}\` (${e.kind})`);
-          if (e.contentText && e.contentText.length < 4000) {
+          const label =
+            e.imageFilename ||
+            (typeof e.meta?.originalName === "string" ? e.meta.originalName : null) ||
+            e.kind;
+          if (e.imageDataUri) {
+            imageN += 1;
+            lines.push(`**Figure ${n}.${imageN}** — ${label} (\`${e.kind}\`)`);
+            lines.push("");
+            // data URI so paper HTML / print preview renders without a separate asset server
+            lines.push(`![${escapeMdAlt(label)}](${e.imageDataUri})`);
+            lines.push("");
+          } else if (e.contentText && e.contentText.length < 4000) {
+            lines.push(`**${label}** (\`${e.kind}\`)`);
             lines.push("");
             lines.push("```http");
             lines.push(e.contentText.trim());
             lines.push("```");
+            lines.push("");
+          } else {
+            lines.push(
+              `- \`${e.id}\` (${e.kind}${e.path ? ` · \`${e.path}\`` : ""}) — file attached; not embedded in this export format.`,
+            );
             lines.push("");
           }
         }
@@ -377,10 +401,12 @@ export function renderMarkdownReport(input: {
     lines.push("_No evidence records in this export._");
     lines.push("");
   } else {
-    lines.push("| Evidence ID | Kind | Finding ID |");
-    lines.push("| --- | --- | --- |");
+    lines.push("| Evidence ID | Kind | Finding ID | Embedded image |");
+    lines.push("| --- | --- | --- | --- |");
     for (const e of evidence) {
-      lines.push(`| \`${e.id}\` | ${e.kind} | ${e.findingId ? `\`${e.findingId}\`` : "—"} |`);
+      lines.push(
+        `| \`${e.id}\` | ${e.kind} | ${e.findingId ? `\`${e.findingId}\`` : "—"} | ${e.imageDataUri ? "yes" : "—"} |`,
+      );
     }
     lines.push("");
   }

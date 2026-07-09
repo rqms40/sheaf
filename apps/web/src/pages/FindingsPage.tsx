@@ -202,6 +202,8 @@ export function FindingsPage() {
     queryKey: ["finding-history", engagementId, selected?.id],
     queryFn: () => api.listFindingHistory(engagementId, selected!.id),
     enabled: !!selected?.id,
+    refetchOnMount: "always",
+    staleTime: 0,
   });
 
   const save = useMutation({
@@ -220,13 +222,16 @@ export function FindingsPage() {
         cve: draft.cve || null,
       });
     },
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       const next = toDraft(res.data);
       setDraft(next);
       setSavedSnapshot(next);
       toast.success("Finding saved");
       invalidate();
-      qc.invalidateQueries({
+      await qc.invalidateQueries({
+        queryKey: ["finding-history", engagementId, res.data.id],
+      });
+      await qc.refetchQueries({
         queryKey: ["finding-history", engagementId, res.data.id],
       });
     },
@@ -341,11 +346,28 @@ export function FindingsPage() {
         filename: file.name,
         contentBase64,
         findingId: selected.id,
+        kind: file.type.startsWith("image/") ? "screenshot" : "file",
+        mimeType: file.type || undefined,
       });
     },
     onSuccess: () => {
       toast.success("File evidence uploaded");
       invalidate();
+      void qc.invalidateQueries({
+        queryKey: ["evidence", engagementId, selected?.id],
+      });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteEvidenceMut = useMutation({
+    mutationFn: (evidenceId: string) => api.deleteEvidence(engagementId, evidenceId),
+    onSuccess: () => {
+      toast.success("Evidence removed");
+      invalidate();
+      void qc.invalidateQueries({
+        queryKey: ["evidence", engagementId, selected?.id],
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -873,7 +895,7 @@ export function FindingsPage() {
                       ref={evidenceFileRef}
                       type="file"
                       className="hidden"
-                      accept="image/*,.txt,.log,.json,.xml,.har"
+                      accept="image/*,.txt,.log,.json,.xml,.har,.pdf"
                       onChange={(e) => {
                         const f = e.target.files?.[0];
                         if (f) uploadEvidenceMut.mutate(f);
@@ -882,24 +904,111 @@ export function FindingsPage() {
                     />
                   </div>
                 </div>
-                {(evidenceQuery.data?.data ?? []).map((ev) => (
-                  <div
-                    key={ev.id}
-                    className="overflow-hidden rounded-md border border-border bg-card"
-                  >
-                    <div className="border-b border-border px-3 py-1.5 text-[11px] uppercase tracking-wide text-faint">
-                      {ev.kind}
+                {(evidenceQuery.data?.data ?? []).map((ev) => {
+                  const meta = (ev.meta ?? {}) as {
+                    originalName?: string;
+                    mimeType?: string;
+                    size?: number;
+                  };
+                  const name = meta.originalName || ev.path || ev.kind;
+                  const mime = meta.mimeType || "";
+                  const isImage =
+                    ev.kind === "screenshot" ||
+                    mime.startsWith("image/") ||
+                    /\.(png|jpe?g|gif|webp|svg)$/i.test(name);
+                  const hasFile = !!ev.path;
+                  const fileUrl = hasFile
+                    ? api.evidenceFileUrl(engagementId, ev.id)
+                    : null;
+                  return (
+                    <div
+                      key={ev.id}
+                      className="overflow-hidden rounded-md border border-border bg-card"
+                      data-testid="evidence-card"
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
+                        <div className="min-w-0">
+                          <span className="text-[11px] uppercase tracking-wide text-faint">
+                            {ev.kind}
+                          </span>
+                          <div className="truncate font-mono text-[11px] text-muted">
+                            {name}
+                            {typeof meta.size === "number"
+                              ? ` · ${(meta.size / 1024).toFixed(1)} KB`
+                              : ""}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {fileUrl ? (
+                            <Button size="sm" variant="ghost" asChild>
+                              <a href={fileUrl} target="_blank" rel="noreferrer">
+                                Open
+                              </a>
+                            </Button>
+                          ) : null}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            disabled={deleteEvidenceMut.isPending}
+                            title="Remove evidence"
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  `Remove this evidence${name ? ` (${name})` : ""}?`,
+                                )
+                              ) {
+                                return;
+                              }
+                              deleteEvidenceMut.mutate(ev.id);
+                            }}
+                          >
+                            <Trash2 className="size-3.5" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                      {isImage && fileUrl ? (
+                        <div className="bg-background/50 p-2">
+                          <a href={fileUrl} target="_blank" rel="noreferrer">
+                            <img
+                              src={fileUrl}
+                              alt={name}
+                              className="mx-auto max-h-80 w-auto max-w-full rounded border border-border object-contain"
+                              loading="lazy"
+                            />
+                          </a>
+                        </div>
+                      ) : null}
+                      {ev.contentText ? (
+                        <pre className="max-h-72 overflow-auto p-3 font-mono text-[11px] text-muted whitespace-pre-wrap">
+                          {ev.contentText}
+                        </pre>
+                      ) : null}
+                      {!isImage && !ev.contentText && hasFile ? (
+                        <div className="p-3 text-[12px] text-muted">
+                          File attached.{" "}
+                          <a
+                            className="text-primary underline-offset-2 hover:underline"
+                            href={fileUrl!}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open / download
+                          </a>
+                        </div>
+                      ) : null}
+                      {!hasFile && !ev.contentText ? (
+                        <div className="p-3 text-[12px] text-faint">Empty evidence row</div>
+                      ) : null}
                     </div>
-                    <pre className="max-h-72 overflow-auto p-3 font-mono text-[11px] text-muted whitespace-pre-wrap">
-                      {ev.contentText || ev.path || "—"}
-                    </pre>
-                  </div>
-                ))}
+                  );
+                })}
                 {(evidenceQuery.data?.data?.length ?? 0) === 0 && (
                   <EmptyState
                     icon={FileWarning}
                     title="No evidence yet"
-                    description="Paste request/response above, or import nuclei results that include HTTP captures."
+                    description="Paste request/response above, or upload a screenshot / file. Images show a preview here."
                     className="py-8"
                   />
                 )}

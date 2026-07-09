@@ -1,6 +1,7 @@
 import {
   Document,
   HeadingLevel,
+  ImageRun,
   Packer,
   Paragraph,
   TextRun,
@@ -11,7 +12,8 @@ import {
 } from "docx";
 import type { Workspace } from "../workspace.js";
 import type { ReportOptions } from "../services.js";
-import { buildExportPackage } from "../services.js";
+import { buildExportPackage, listEvidence } from "../services.js";
+import { docxImageType, loadReportImage } from "./images.js";
 
 function cell(text: string, bold = false) {
   return new TableCell({
@@ -24,7 +26,7 @@ function cell(text: string, bold = false) {
   });
 }
 
-/** Client DOCX export from structured casefile data. */
+/** Client DOCX export from structured casefile data (includes embedded screenshots). */
 export async function buildDocxBuffer(
   ws: Workspace,
   engagementId: string,
@@ -36,6 +38,7 @@ export async function buildDocxBuffer(
   });
   const eng = pkg.engagement;
   const findings = pkg.findings as Array<{
+    id: string;
     title: string;
     severity: string;
     status: string;
@@ -47,6 +50,8 @@ export async function buildDocxBuffer(
     cwe: string | null;
     cve: string | null;
   }>;
+
+  const allEvidence = listEvidence(ws, engagementId);
 
   const children: (Paragraph | Table)[] = [];
 
@@ -158,6 +163,96 @@ export async function buildDocxBuffer(
     children.push(new Paragraph({ text: f.impact || "—" }));
     children.push(new Paragraph({ text: "Remediation", heading: HeadingLevel.HEADING_3 }));
     children.push(new Paragraph({ text: f.remediation || "—" }));
+
+    const linked = allEvidence.filter((e) => e.findingId === f.id);
+    const images = linked
+      .map((e) => ({ e, img: loadReportImage(ws, e) }))
+      .filter((x): x is { e: (typeof linked)[0]; img: NonNullable<ReturnType<typeof loadReportImage>> } =>
+        Boolean(x.img),
+      );
+
+    if (images.length) {
+      children.push(new Paragraph({ text: "Evidence", heading: HeadingLevel.HEADING_3 }));
+      let fig = 0;
+      for (const { img } of images) {
+        const dtype = docxImageType(img.mime);
+        if (!dtype) {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: `[Image not embedded in DOCX: ${img.filename} (${img.mime})]`,
+                  italics: true,
+                  size: 18,
+                  color: "666666",
+                }),
+              ],
+            }),
+          );
+          continue;
+        }
+        fig += 1;
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Figure ${fig}: ${img.filename}`,
+                italics: true,
+                size: 18,
+              }),
+            ],
+          }),
+        );
+        children.push(
+          new Paragraph({
+            children: [
+              new ImageRun({
+                type: dtype,
+                data: img.bytes,
+                transformation: {
+                  width: img.width,
+                  height: img.height,
+                },
+                altText: {
+                  title: img.filename,
+                  description: `Evidence screenshot ${img.filename}`,
+                  name: img.filename,
+                },
+              }),
+            ],
+          }),
+        );
+      }
+    }
+
+    // Text evidence snippets
+    for (const e of linked) {
+      if (e.contentText && e.contentText.trim()) {
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `Text evidence (${e.kind})`,
+                bold: true,
+                size: 18,
+              }),
+            ],
+          }),
+        );
+        const snippet = e.contentText.trim().slice(0, 3500);
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: snippet,
+                font: "Consolas",
+                size: 16,
+              }),
+            ],
+          }),
+        );
+      }
+    }
   }
 
   children.push(new Paragraph({ text: "" }));

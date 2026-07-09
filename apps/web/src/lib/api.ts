@@ -91,7 +91,14 @@ export type FindingRevision = {
   engagementId: string;
   findingId: string;
   revision: number;
-  source: "create" | "edit" | "import" | "archive" | "restore" | "status";
+  source:
+    | "create"
+    | "edit"
+    | "import"
+    | "archive"
+    | "restore"
+    | "status"
+    | "baseline";
   summary: string;
   snapshot: {
     title: string;
@@ -227,6 +234,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  deleteEvidence: (id: string, evidenceId: string) =>
+    request<{ ok: boolean }>(`/api/engagements/${id}/evidence/${evidenceId}`, {
+      method: "DELETE",
+    }),
+  /** Same-origin URL for previewing / downloading a file attachment */
+  evidenceFileUrl: (id: string, evidenceId: string) =>
+    `/api/engagements/${id}/evidence/${evidenceId}/file`,
   importNuclei: (id: string, content: string, sourcePath?: string) =>
     request<{ data: { created: number; updated: number; runId: string } }>(
       `/api/engagements/${id}/import/nuclei`,
@@ -274,6 +288,7 @@ export const api = {
       contentBase64: string;
       findingId?: string;
       kind?: string;
+      mimeType?: string;
     },
   ) =>
     request<{ data: Evidence }>(`/api/engagements/${id}/evidence/upload`, {

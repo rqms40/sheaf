@@ -19,6 +19,7 @@ import { normalizeFfufFile } from "./importers/ffuf.js";
 import { parseBurpIssuesXml } from "./importers/burp.js";
 import { manualFingerprint } from "./fingerprint.js";
 import { renderMarkdownReport } from "./report/markdown.js";
+import { loadReportImage } from "./report/images.js";
 import { checklistForType } from "./checklist/definitions.js";
 import {
   deleteFindingRevisions,
@@ -1062,6 +1063,10 @@ export function saveEvidenceFile(
   fs.writeFileSync(abs, input.bytes, { mode: 0o600 });
   const rel = path.relative(ws.sheafDir, abs);
   const kind = input.kind ?? (/\.(png|jpe?g|gif|webp)$/i.test(input.filename) ? "screenshot" : "file");
+  const mime =
+    input.meta?.mimeType && typeof input.meta.mimeType === "string"
+      ? input.meta.mimeType
+      : guessMime(input.filename);
   ws.db
     .insert(schema.evidence)
     .values({
@@ -1075,12 +1080,93 @@ export function saveEvidenceFile(
         ...(input.meta ?? {}),
         originalName: input.filename,
         size: input.bytes.length,
+        mimeType: mime,
       }),
       createdAt: nowMs(),
     })
     .run();
   addTimeline(ws, engagementId, "other", `File evidence: ${input.filename}`, "evidence", id);
   return listEvidence(ws, engagementId).find((e) => e.id === id)!;
+}
+
+function guessMime(filename: string): string {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (lower.endsWith(".json")) return "application/json";
+  if (lower.endsWith(".xml")) return "application/xml";
+  if (lower.endsWith(".html") || lower.endsWith(".htm")) return "text/html";
+  if (lower.endsWith(".txt") || lower.endsWith(".log") || lower.endsWith(".md"))
+    return "text/plain";
+  return "application/octet-stream";
+}
+
+export function getEvidence(
+  ws: Workspace,
+  engagementId: string,
+  evidenceId: string,
+) {
+  return listEvidence(ws, engagementId).find((e) => e.id === evidenceId) ?? null;
+}
+
+/** Resolve absolute path for file evidence; null if missing or path escapes workspace. */
+export function resolveEvidenceFile(
+  ws: Workspace,
+  engagementId: string,
+  evidenceId: string,
+): { abs: string; mime: string; filename: string } | null {
+  const row = getEvidence(ws, engagementId, evidenceId);
+  if (!row?.path) return null;
+  const abs = path.resolve(ws.sheafDir, row.path);
+  const root = path.resolve(ws.sheafDir) + path.sep;
+  if (!abs.startsWith(root) && abs !== path.resolve(ws.sheafDir)) return null;
+  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return null;
+  const meta = row.meta as Record<string, unknown>;
+  const filename =
+    (typeof meta.originalName === "string" && meta.originalName) ||
+    path.basename(abs);
+  const mime =
+    (typeof meta.mimeType === "string" && meta.mimeType) || guessMime(filename);
+  return { abs, mime, filename };
+}
+
+export function deleteEvidence(
+  ws: Workspace,
+  engagementId: string,
+  evidenceId: string,
+): boolean {
+  const row = getEvidence(ws, engagementId, evidenceId);
+  if (!row) return false;
+
+  const file = resolveEvidenceFile(ws, engagementId, evidenceId);
+  if (file) {
+    try {
+      fs.unlinkSync(file.abs);
+    } catch {
+      // file may already be gone
+    }
+  }
+
+  ws.db
+    .delete(schema.evidence)
+    .where(
+      and(
+        eq(schema.evidence.id, evidenceId),
+        eq(schema.evidence.engagementId, engagementId),
+      ),
+    )
+    .run();
+
+  const label =
+    (row.meta as { originalName?: string })?.originalName ||
+    row.kind ||
+    evidenceId.slice(0, 8);
+  addTimeline(ws, engagementId, "other", `Evidence removed: ${label}`, "evidence", evidenceId);
+  return true;
 }
 
 export function ensureChecklist(ws: Workspace, engagementId: string) {
@@ -1218,9 +1304,16 @@ export function buildReport(
     findings = findings.filter((f) => f.status === "confirmed");
   }
   const scope = listScope(ws, engagementId);
-  const evidence = listEvidence(ws, engagementId).filter(
-    (e) => !e.findingId || findings.some((f) => f.id === e.findingId),
-  );
+  const evidence = listEvidence(ws, engagementId)
+    .filter((e) => !e.findingId || findings.some((f) => f.id === e.findingId))
+    .map((e) => {
+      const img = loadReportImage(ws, e);
+      return {
+        ...e,
+        imageDataUri: img?.dataUri ?? null,
+        imageFilename: img?.filename ?? null,
+      };
+    });
   const assets = listAssets(ws, engagementId);
   const runs = listRuns(ws, engagementId);
   return renderMarkdownReport({

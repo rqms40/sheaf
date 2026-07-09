@@ -11,6 +11,7 @@ const SOURCE_LABEL: Record<string, string> = {
   archive: "Archived",
   restore: "Restored",
   status: "Status",
+  baseline: "Baseline",
 };
 
 function previewValue(v: unknown): string {
@@ -25,6 +26,8 @@ function sourceTone(source: string): string {
   switch (source) {
     case "create":
       return "bg-low/15 text-low border-low/30";
+    case "baseline":
+      return "bg-faint/15 text-muted border-border";
     case "restore":
       return "bg-primary/15 text-primary border-primary/35";
     case "archive":
@@ -69,7 +72,8 @@ export function FindingHistory({
         <History className="mx-auto size-6 text-faint" />
         <p className="mt-3 text-[13px] font-medium text-foreground">No versions yet</p>
         <p className="mt-1 text-[12px] text-muted">
-          Saves, status changes, and restores appear here as a permanent trail.
+          Click <strong className="font-medium text-foreground">Save changes</strong> after
+          editing — the trail records each save (and seeds a baseline for older findings).
         </p>
       </div>
     );
