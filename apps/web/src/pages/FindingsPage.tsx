@@ -46,7 +46,7 @@ import { api, type Finding } from "@/lib/api";
 import { readFileAsBase64, readFileAsText } from "@/lib/files";
 import { cn } from "@/lib/utils";
 
-type ImportTool = "nuclei" | "nmap" | "httpx" | "ffuf" | "burp";
+type ImportTool = "nuclei" | "nmap" | "httpx" | "ffuf" | "burp" | "naabu";
 
 /** Working statuses for edit form (archive is a separate action). */
 const STATUSES = [
@@ -311,6 +311,7 @@ export function FindingsPage() {
       if (importKind === "nmap") return api.importNmap(engagementId, importText, src);
       if (importKind === "httpx") return api.importHttpx(engagementId, importText, src);
       if (importKind === "burp") return api.importBurp(engagementId, importText, src);
+      if (importKind === "naabu") return api.importNaabu(engagementId, importText, src);
       return api.importFfuf(engagementId, importText, src);
     },
     onSuccess: (res) => {
@@ -1072,7 +1073,7 @@ export function FindingsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-wrap gap-2">
-            {(["nuclei", "nmap", "httpx", "ffuf", "burp"] as ImportTool[]).map((t) => (
+            {(["nuclei", "nmap", "httpx", "ffuf", "burp", "naabu"] as ImportTool[]).map((t) => (
               <Button
                 key={t}
                 size="sm"

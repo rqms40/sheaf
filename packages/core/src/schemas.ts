@@ -34,7 +34,15 @@ export const ACTIVE_FINDING_STATUSES: FindingStatus[] = [
 export const ScopeKind = z.enum(["domain", "url", "cidr", "wildcard", "ip"]);
 export type ScopeKind = z.infer<typeof ScopeKind>;
 
-export const ToolName = z.enum(["nuclei", "nmap", "httpx", "ffuf", "manual", "other"]);
+export const ToolName = z.enum([
+  "nuclei",
+  "nmap",
+  "httpx",
+  "ffuf",
+  "naabu",
+  "manual",
+  "other",
+]);
 export type ToolName = z.infer<typeof ToolName>;
 
 export const EvidenceKind = z.enum(["file", "http", "screenshot", "note_ref", "other"]);

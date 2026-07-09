@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* UI density from Settings (data-density on <html>) */
+html[data-density="compact"] body {
+  font-size: 12px;
+}
+html[data-density="compact"] .paper-surface {
+  font-size: 13px;
+}
+
 @theme {
   --color-background: #0f1115;
   --color-card: #161a22;

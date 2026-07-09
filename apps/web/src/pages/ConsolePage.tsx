@@ -1,9 +1,12 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { AlertTriangle, Square, Terminal } from "lucide-react";
+import { AlertTriangle, Crosshair, Square, Terminal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/sheaf/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 type Line = { id: number; kind: "out" | "sys" | "err" | "cmd"; text: string };
@@ -20,11 +23,13 @@ function consoleWsUrl(engagementId: string): string {
  */
 export function ConsolePage() {
   const { engagementId } = useParams({ strict: false }) as { engagementId: string };
+  const qc = useQueryClient();
   const [lines, setLines] = useState<Line[]>([]);
   const [cmd, setCmd] = useState("");
   const [connected, setConnected] = useState(false);
   const [running, setRunning] = useState(false);
   const [cwd, setCwd] = useState("");
+  const [captureLine, setCaptureLine] = useState("nmap -sn 127.0.0.1");
   const seq = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -33,6 +38,34 @@ export function ConsolePage() {
   const everConnected = useRef(false);
   const introShown = useRef(false);
   const failHintShown = useRef(false);
+
+  const settingsQ = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => api.getSettings(),
+  });
+
+  const captureMut = useMutation({
+    mutationFn: () => {
+      const argv =
+        captureLine.match(/(?:[^\s"]+|"[^"]*")+/g)?.map((a) => a.replace(/^"|"$/g, "")) ??
+        [];
+      return api.wrapCommand({
+        argv,
+        engagementId,
+        autoImport: settingsQ.data?.data.autoImportOnWrap !== false,
+      });
+    },
+    onSuccess: (res) => {
+      toast.success(res.data.message);
+      push("sys", `[capture] ${res.data.message}`);
+      if (res.data.stderrTail) push("out", res.data.stderrTail.slice(-2000));
+      qc.invalidateQueries({ queryKey: ["runs", engagementId] });
+      qc.invalidateQueries({ queryKey: ["assets", engagementId] });
+      qc.invalidateQueries({ queryKey: ["findings", engagementId] });
+      qc.invalidateQueries({ queryKey: ["timeline", engagementId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const push = useCallback((kind: Line["kind"], text: string) => {
     seq.current += 1;
@@ -253,6 +286,42 @@ export function ConsolePage() {
           This console can run any command the Sheaf process user can run. Keep the API on{" "}
           <code className="font-mono text-[11px]">127.0.0.1</code>. A compromised UI (XSS)
           is equivalent to shell on this host. Authorized use only.
+        </p>
+      </div>
+
+      <div className="mx-3 mt-2 rounded-md border border-border bg-card/60 px-3 py-2 sm:mx-5 lg:mx-6">
+        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-faint">
+          <Crosshair className="size-3" />
+          Capture to this engagement
+        </div>
+        <form
+          className="flex flex-col gap-2 sm:flex-row sm:items-center"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!captureLine.trim()) return;
+            captureMut.mutate();
+          }}
+        >
+          <Input
+            className="font-mono text-[12px]"
+            value={captureLine}
+            onChange={(e) => setCaptureLine(e.target.value)}
+            placeholder="nmap -sV target   or   nuclei -u https://…"
+            data-testid="capture-command"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            className="shrink-0"
+            disabled={captureMut.isPending || !captureLine.trim()}
+          >
+            {captureMut.isPending ? "Capturing…" : "Run & import"}
+          </Button>
+        </form>
+        <p className="mt-1.5 text-[11px] text-faint">
+          Known tools (nmap, nuclei, httpx, ffuf, naabu) get machine-readable flags and
+          import into this case. CLI:{" "}
+          <code className="font-mono text-muted">sheaf wrap -e … -- nmap …</code>
         </p>
       </div>
 

@@ -3,7 +3,7 @@ import { useParams } from "@tanstack/react-router";
 import DOMPurify from "dompurify";
 import { Download, FileJson, FileOutput, FileType, Printer, RefreshCw } from "lucide-react";
 import { marked } from "marked";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/sheaf/EmptyState";
 import { PageHeader } from "@/components/sheaf/PageHeader";
@@ -38,7 +38,17 @@ function renderReportHtml(markdown: string): string {
 
 export function ReportPage() {
   const { engagementId } = useParams({ strict: false }) as { engagementId: string };
+  const settingsQ = useQuery({
+    queryKey: ["settings"],
+    queryFn: () => api.getSettings(),
+  });
   const [confirmedOnly, setConfirmedOnly] = useState(false);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  useEffect(() => {
+    if (prefsLoaded || !settingsQ.data?.data) return;
+    setConfirmedOnly(settingsQ.data.data.reportConfirmedOnly);
+    setPrefsLoaded(true);
+  }, [settingsQ.data?.data, prefsLoaded]);
   const eng = useQuery({
     queryKey: ["engagement", engagementId],
     queryFn: () => api.getEngagement(engagementId),

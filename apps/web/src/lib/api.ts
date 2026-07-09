@@ -86,6 +86,16 @@ export type Asset = {
   }>;
 };
 
+export type SheafSettings = {
+  version: number;
+  createdAt?: number;
+  activeEngagementId: string | null;
+  reportConfirmedOnly: boolean;
+  autoImportOnWrap: boolean;
+  consoleCwd: "workspace" | "engagement";
+  uiDensity: "comfortable" | "compact";
+};
+
 export type FindingRevision = {
   id: string;
   engagementId: string;
@@ -143,6 +153,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<{ ok: boolean; workspace: string }>("/api/health"),
+  getSettings: () => request<{ data: SheafSettings }>("/api/settings"),
+  updateSettings: (body: Partial<SheafSettings>) =>
+    request<{ data: SheafSettings }>("/api/settings", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  wrapCommand: (body: {
+    argv?: string[];
+    command?: string;
+    engagementId?: string;
+    autoImport?: boolean;
+  }) =>
+    request<{
+      data: {
+        tool: string;
+        command: string;
+        engagementId: string;
+        exitCode: number;
+        stdoutPath: string;
+        stderrTail: string;
+        imported: boolean;
+        importResult?: unknown;
+        message: string;
+      };
+    }>("/api/wrap", { method: "POST", body: JSON.stringify(body) }),
   listEngagements: () => request<{ data: Engagement[] }>("/api/engagements"),
   createEngagement: (body: {
     name: string;
@@ -276,6 +311,14 @@ export const api = {
   importBurp: (id: string, content: string, sourcePath?: string) =>
     request<{ data: { created: number; updated: number; runId: string } }>(
       `/api/engagements/${id}/import/burp`,
+      {
+        method: "POST",
+        body: JSON.stringify({ content, sourcePath }),
+      },
+    ),
+  importNaabu: (id: string, content: string, sourcePath?: string) =>
+    request<{ data: { created: number; updated: number; runId: string } }>(
+      `/api/engagements/${id}/import/naabu`,
       {
         method: "POST",
         body: JSON.stringify({ content, sourcePath }),

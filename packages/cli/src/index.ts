@@ -9,9 +9,11 @@ import {
   buildExportPackage,
   createEngagement,
   deleteFinding,
+  getSettings,
   importBurp,
   importFfuf,
   importHttpx,
+  importNaabu,
   importNmap,
   importNuclei,
   initWorkspace,
@@ -22,6 +24,8 @@ import {
   probeFinding,
   runToolAndImport,
   setChecklistItem,
+  updateSettings,
+  wrapAndCapture,
   writeReportFile,
 } from "@sheaf/core";
 
@@ -236,11 +240,25 @@ imp
     );
   });
 
+imp
+  .command("naabu")
+  .argument("<file>", "naabu JSON/JSONL file")
+  .requiredOption("-e, --engagement <id>", "engagement id")
+  .option("-w, --workspace <path>", "workspace root", ".")
+  .action((file: string, opts: { engagement: string; workspace: string }) => {
+    const ws = openWorkspace(path.resolve(opts.workspace));
+    const raw = fs.readFileSync(path.resolve(file), "utf8");
+    const result = importNaabu(ws, opts.engagement, raw, path.resolve(file));
+    console.log(
+      `naabu import complete: ${result.created} new, ${result.updated} updated (run ${result.runId})`,
+    );
+  });
+
 program
   .command("run")
   .description("Spawn tool on PATH and import output (authorized targets only)")
   .requiredOption("-e, --engagement <id>", "engagement id")
-  .requiredOption("-t, --tool <tool>", "nuclei|nmap|httpx|ffuf")
+  .requiredOption("-t, --tool <tool>", "nuclei|nmap|httpx|ffuf|naabu")
   .argument("[args...]", "tool arguments")
   .option("-w, --workspace <path>", "workspace root", ".")
   .action(
@@ -249,9 +267,80 @@ program
       opts: { engagement: string; tool: string; workspace: string },
     ) => {
       const ws = openWorkspace(path.resolve(opts.workspace));
-      const tool = opts.tool as "nuclei" | "nmap" | "httpx" | "ffuf";
+      const tool = opts.tool as "nuclei" | "nmap" | "httpx" | "ffuf" | "naabu";
       const result = await runToolAndImport(ws, opts.engagement, tool, args);
       console.log(JSON.stringify(result, null, 2));
+    },
+  );
+
+program
+  .command("wrap")
+  .description(
+    "Run a shell tool and auto-import into active engagement (nmap/nuclei/httpx/ffuf/naabu)",
+  )
+  .option("-e, --engagement <id>", "engagement id (default: settings active)")
+  .option("-w, --workspace <path>", "workspace root", ".")
+  .option("--no-import", "capture output only, skip import")
+  .argument("<argv...>", "command and args (use -- before flags)")
+  .action(
+    async (
+      argv: string[],
+      opts: { engagement?: string; workspace: string; import?: boolean },
+    ) => {
+      const ws = openWorkspace(path.resolve(opts.workspace));
+      // commander may leave a leading -- 
+      const clean = argv[0] === "--" ? argv.slice(1) : argv;
+      const result = await wrapAndCapture(ws, clean, {
+        engagementId: opts.engagement,
+        autoImport: opts.import !== false,
+        onChunk: (s) => process.stderr.write(s),
+      });
+      console.log(JSON.stringify(result, null, 2));
+      if (result.exitCode !== 0) process.exitCode = result.exitCode;
+    },
+  );
+
+const settingsCmd = program.command("settings").description("Workspace preferences");
+
+settingsCmd
+  .command("get")
+  .option("-w, --workspace <path>", "workspace root", ".")
+  .action((opts: { workspace: string }) => {
+    const ws = openWorkspace(path.resolve(opts.workspace));
+    console.log(JSON.stringify(getSettings(ws), null, 2));
+  });
+
+settingsCmd
+  .command("set")
+  .option("-w, --workspace <path>", "workspace root", ".")
+  .option("--active <id>", "active engagement id (empty string to clear)")
+  .option("--confirmed-only", "default report confirmed-only")
+  .option("--no-confirmed-only", "default report all active findings")
+  .option("--auto-import", "enable auto-import on wrap")
+  .option("--no-auto-import", "disable auto-import on wrap")
+  .option("--density <mode>", "comfortable|compact")
+  .action(
+    (opts: {
+      workspace: string;
+      active?: string;
+      confirmedOnly?: boolean;
+      autoImport?: boolean;
+      density?: string;
+    }) => {
+      const ws = openWorkspace(path.resolve(opts.workspace));
+      const patch: Record<string, unknown> = {};
+      if (opts.active !== undefined) {
+        patch.activeEngagementId = opts.active === "" ? null : opts.active;
+      }
+      if (opts.confirmedOnly === true) patch.reportConfirmedOnly = true;
+      if (opts.confirmedOnly === false) patch.reportConfirmedOnly = false;
+      if (opts.autoImport === true) patch.autoImportOnWrap = true;
+      if (opts.autoImport === false) patch.autoImportOnWrap = false;
+      if (opts.density === "comfortable" || opts.density === "compact") {
+        patch.uiDensity = opts.density;
+      }
+      const data = updateSettings(ws, patch);
+      console.log(JSON.stringify(data, null, 2));
     },
   );
 

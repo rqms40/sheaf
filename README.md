@@ -39,7 +39,9 @@ No cloud. No multi-tenant SaaS. Workspace lives under `./.sheaf/` (SQLite + evid
 | **History** | Append-only revisions (create / edit / restore) |
 | **Report** | Structured Markdown, paper HTML (print-friendly), DOCX, JSON package — screenshots embed in the report |
 | **Runs** | Spawn tools on `PATH` and auto-import (authorized targets only) |
-| **Console** | Local job console (`bash -lc` over WebSocket, **127.0.0.1 only** — not a full PTY) |
+| **Wrap** | `sheaf wrap -- nmap …` captures output into the **active** casefile (or `-e`) |
+| **Settings** | Active engagement, auto-import, report defaults, UI density |
+| **Console** | Local job console + **Run & import** capture (`127.0.0.1` only — not a full PTY) |
 
 ## Stack
 
@@ -98,6 +100,12 @@ pnpm sheaf -- import nmap ./scan.xml -e <id>
 pnpm sheaf -- import httpx ./httpx.jsonl -e <id>
 pnpm sheaf -- import ffuf ./ffuf.json -e <id>
 pnpm sheaf -- import burp ./issues.xml -e <id>
+pnpm sheaf -- import naabu ./ports.jsonl -e <id>
+
+# Active casefile for wrap (also in UI Settings)
+pnpm sheaf -- settings set --active <id>
+pnpm sheaf -- wrap -- nmap -sV scanme.nmap.org
+pnpm sheaf -- wrap -e <id> -- nuclei -u https://target
 
 pnpm sheaf -- run -e <id> -t nuclei -- -u https://target
 pnpm sheaf -- checklist list -e <id>

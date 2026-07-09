@@ -3,9 +3,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { Workspace } from "./workspace.js";
-import { importNuclei, importNmap, importHttpx, importFfuf, addTimeline } from "./services.js";
+import {
+  importNuclei,
+  importNmap,
+  importHttpx,
+  importFfuf,
+  importNaabu,
+  addTimeline,
+} from "./services.js";
 
-export type RunToolName = "nuclei" | "nmap" | "httpx" | "ffuf";
+export type RunToolName = "nuclei" | "nmap" | "httpx" | "ffuf" | "naabu";
 
 export type RunToolResult = {
   tool: RunToolName;
@@ -93,6 +100,8 @@ export async function runToolAndImport(
     finalArgs = [...args, "-json", "-o", outFile];
   } else if (tool === "ffuf" && !args.some((a) => a === "-o" || a === "-of")) {
     finalArgs = [...args, "-of", "json", "-o", outFile];
+  } else if (tool === "naabu" && !args.some((a) => a === "-json" || a === "-o" || a === "-j")) {
+    finalArgs = [...args, "-json", "-o", outFile];
   }
 
   addTimeline(
@@ -122,6 +131,7 @@ export async function runToolAndImport(
       else if (tool === "nmap") importResult = importNmap(ws, engagementId, content, outFile);
       else if (tool === "httpx") importResult = importHttpx(ws, engagementId, content, outFile);
       else if (tool === "ffuf") importResult = importFfuf(ws, engagementId, content, outFile);
+      else if (tool === "naabu") importResult = importNaabu(ws, engagementId, content, outFile);
     }
   } catch (e) {
     importResult = { error: e instanceof Error ? e.message : String(e) };

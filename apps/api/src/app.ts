@@ -21,11 +21,15 @@ import {
   getEvidence,
   getFinding,
   getFindingTemplate,
+  getSettings,
   importBurp,
   importFfuf,
   importHttpx,
+  importNaabu,
   importNmap,
   importNuclei,
+  updateSettings,
+  wrapAndCapture,
   listAssets,
   listChecklist,
   listEngagements,
@@ -89,6 +93,40 @@ export function createApp(getWorkspace: () => Workspace) {
       workspace: c.get("workspace").root,
     }),
   );
+
+  app.get("/api/settings", (c) => {
+    return c.json({ data: getSettings(c.get("workspace")) });
+  });
+
+  app.patch("/api/settings", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    try {
+      const data = updateSettings(c.get("workspace"), body);
+      return c.json({ data });
+    } catch (e) {
+      return jsonError(c, 400, "validation_error", e instanceof Error ? e.message : "invalid settings");
+    }
+  });
+
+  app.post("/api/wrap", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const argv = Array.isArray(body.argv)
+      ? body.argv.map(String)
+      : String(body.command || "")
+          .match(/(?:[^\s"]+|"[^"]*")+/g)
+          ?.map((a: string) => a.replace(/^"|"$/g, "")) ?? [];
+    if (!argv.length) return jsonError(c, 400, "validation_error", "argv or command required");
+    const engagementId = body.engagementId ? String(body.engagementId) : undefined;
+    try {
+      const result = await wrapAndCapture(c.get("workspace"), argv, {
+        engagementId,
+        autoImport: body.autoImport !== false,
+      });
+      return c.json({ data: result });
+    } catch (e) {
+      return jsonError(c, 400, "wrap_error", e instanceof Error ? e.message : "wrap failed");
+    }
+  });
 
   app.get("/api/engagements", (c) => {
     return c.json({ data: listEngagements(c.get("workspace")) });
@@ -415,6 +453,25 @@ export function createApp(getWorkspace: () => Workspace) {
   );
 
   app.post(
+    "/api/engagements/:id/import/naabu",
+    bodyLimit({ maxSize: 50 * 1024 * 1024 }),
+    async (c) => {
+      if (!getEngagement(c.get("workspace"), c.req.param("id")))
+        return jsonError(c, 404, "not_found", "Engagement not found");
+      const body = await c.req.json();
+      const content = String(body.content ?? "");
+      const sourcePath = body.sourcePath ? String(body.sourcePath) : undefined;
+      if (!content.trim()) return jsonError(c, 400, "validation_error", "content required");
+      try {
+        const result = importNaabu(c.get("workspace"), c.req.param("id"), content, sourcePath);
+        return c.json({ data: result });
+      } catch (e) {
+        return jsonError(c, 400, "import_error", e instanceof Error ? e.message : "import failed");
+      }
+    },
+  );
+
+  app.post(
     "/api/engagements/:id/evidence/upload",
     bodyLimit({ maxSize: 25 * 1024 * 1024 }),
     async (c) => {
@@ -486,14 +543,19 @@ export function createApp(getWorkspace: () => Workspace) {
     const body = await c.req.json();
     const tool = String(body.tool || "");
     const args = Array.isArray(body.args) ? body.args.map(String) : [];
-    if (!["nuclei", "nmap", "httpx", "ffuf"].includes(tool)) {
-      return jsonError(c, 400, "validation_error", "tool must be nuclei|nmap|httpx|ffuf");
+    if (!["nuclei", "nmap", "httpx", "ffuf", "naabu"].includes(tool)) {
+      return jsonError(
+        c,
+        400,
+        "validation_error",
+        "tool must be nuclei|nmap|httpx|ffuf|naabu",
+      );
     }
     try {
       const result = await runToolAndImport(
         c.get("workspace"),
         c.req.param("id"),
-        tool as "nuclei" | "nmap" | "httpx" | "ffuf",
+        tool as "nuclei" | "nmap" | "httpx" | "ffuf" | "naabu",
         args,
       );
       return c.json({ data: result });

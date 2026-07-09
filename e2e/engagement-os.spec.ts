@@ -239,6 +239,41 @@ test.describe("Sheaf Engagement OS", () => {
     expect(listBody.data.every((e: { id: string }) => e.id !== ev.id)).toBeTruthy();
   });
 
+  test("settings and naabu import + wrap resolution", async ({ request }) => {
+    const create = await request.post("/api/engagements", {
+      data: { name: "Wrap Case", type: "network" },
+    });
+    const { data: eng } = await create.json();
+
+    const set = await request.patch("/api/settings", {
+      data: {
+        activeEngagementId: eng.id,
+        autoImportOnWrap: true,
+        reportConfirmedOnly: true,
+        uiDensity: "compact",
+      },
+    });
+    expect(set.ok()).toBeTruthy();
+    const got = await request.get("/api/settings");
+    const settings = await got.json();
+    expect(settings.data.activeEngagementId).toBe(eng.id);
+    expect(settings.data.reportConfirmedOnly).toBe(true);
+
+    const naabu = `{"host":"lab.local","ip":"10.0.0.9","port":443,"protocol":"tcp"}
+{"host":"lab.local","ip":"10.0.0.9","port":80,"protocol":"tcp"}
+`;
+    const imp = await request.post(`/api/engagements/${eng.id}/import/naabu`, {
+      data: { content: naabu, sourcePath: "e2e-naabu.jsonl" },
+    });
+    expect(imp.ok()).toBeTruthy();
+    const body = await imp.json();
+    expect(body.data.created).toBe(1);
+
+    const assets = await request.get(`/api/engagements/${eng.id}/assets`);
+    const list = await assets.json();
+    expect(list.data.some((a: { host: string }) => a.host.includes("lab.local"))).toBeTruthy();
+  });
+
   test("burp import creates findings", async ({ request }) => {
     const create = await request.post("/api/engagements", {
       data: { name: "Burp Import Case", type: "web" },

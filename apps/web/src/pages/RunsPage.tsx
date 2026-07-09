@@ -187,6 +187,7 @@ export function RunsPage() {
                   <SelectItem value="nmap">nmap</SelectItem>
                   <SelectItem value="httpx">httpx</SelectItem>
                   <SelectItem value="ffuf">ffuf</SelectItem>
+                  <SelectItem value="naabu">naabu</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -198,6 +199,12 @@ export function RunsPage() {
                 onChange={(e) => setArgsLine(e.target.value)}
                 placeholder="-u https://target.example"
               />
+              <p className="text-[11px] text-faint">
+                Or from shell:{" "}
+                <code className="font-mono text-muted">
+                  sheaf wrap -e {engagementId.slice(0, 8)}… -- nmap -sV target
+                </code>
+              </p>
             </div>
           </div>
           <DialogFooter>

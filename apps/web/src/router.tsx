@@ -14,6 +14,7 @@ import { ReportPage } from "./pages/ReportPage";
 import { RunsPage } from "./pages/RunsPage";
 import { ChecklistPage } from "./pages/ChecklistPage";
 import { ConsolePage } from "./pages/ConsolePage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -23,6 +24,12 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: HomePage,
+});
+
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings",
+  component: SettingsPage,
 });
 
 const engagementRoute = createRoute({
@@ -86,6 +93,7 @@ const consoleRoute = createRoute({
 
 export const routeTree = rootRoute.addChildren([
   indexRoute,
+  settingsRoute,
   engagementRoute.addChildren([
     engagementIndexRoute,
     findingsRoute,

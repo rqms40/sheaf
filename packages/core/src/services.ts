@@ -17,6 +17,7 @@ import { parseNmapXml } from "./importers/nmap.js";
 import { parseHttpx } from "./importers/httpx.js";
 import { normalizeFfufFile } from "./importers/ffuf.js";
 import { parseBurpIssuesXml } from "./importers/burp.js";
+import { parseNaabu } from "./importers/naabu.js";
 import { manualFingerprint } from "./fingerprint.js";
 import { renderMarkdownReport } from "./report/markdown.js";
 import { loadReportImage } from "./report/images.js";
@@ -815,6 +816,92 @@ export function importNmap(
     engagementId,
     "import",
     `Imported nmap (${created} new hosts, ${updated} updated, ${assets.length} total)`,
+    "run",
+    runId,
+  );
+  touchEngagement(ws, engagementId);
+  return { runId, created, updated, skipped: 0, assets: assets.length };
+}
+
+export function importNaabu(
+  ws: Workspace,
+  engagementId: string,
+  raw: string,
+  sourcePath?: string,
+): ImportResult {
+  const assets = parseNaabu(raw);
+  const now = nowMs();
+  const runId = newId();
+  ws.db
+    .insert(schema.runs)
+    .values({
+      id: runId,
+      engagementId,
+      tool: "other",
+      label: sourcePath ? path.basename(sourcePath) : "naabu import",
+      sourcePath: sourcePath ?? null,
+      startedAt: now,
+      finishedAt: now,
+      metaJson: JSON.stringify({ hosts: assets.length, source: "naabu" }),
+      createdAt: now,
+    })
+    .run();
+
+  let created = 0;
+  let updated = 0;
+  for (const asset of assets) {
+    const existing = ws.db
+      .select()
+      .from(schema.assets)
+      .where(and(eq(schema.assets.engagementId, engagementId), eq(schema.assets.host, asset.host)))
+      .get();
+    const portsJson = JSON.stringify(asset.ports);
+    if (existing) {
+      // merge ports
+      let prev: unknown[] = [];
+      try {
+        prev = JSON.parse(existing.portsJson || "[]") as unknown[];
+      } catch {
+        prev = [];
+      }
+      const merged = [...prev];
+      for (const p of asset.ports) {
+        const hit = merged.some(
+          (x) =>
+            x &&
+            typeof x === "object" &&
+            (x as { port?: number }).port === p.port &&
+            (x as { protocol?: string }).protocol === p.protocol,
+        );
+        if (!hit) merged.push(p);
+      }
+      ws.db
+        .update(schema.assets)
+        .set({ portsJson: JSON.stringify(merged), sourceRunId: runId })
+        .where(eq(schema.assets.id, existing.id))
+        .run();
+      updated += 1;
+    } else {
+      ws.db
+        .insert(schema.assets)
+        .values({
+          id: newId(),
+          engagementId,
+          host: asset.host,
+          portsJson,
+          tagsJson: JSON.stringify(["naabu"]),
+          sourceRunId: runId,
+          createdAt: now,
+        })
+        .run();
+      created += 1;
+    }
+  }
+  addTimeline(
+    ws,
+    engagementId,
+    "import",
+    `Imported naabu (${created} new hosts, ${updated} updated, ${assets.length} total)`,
     "run",
     runId,
   );

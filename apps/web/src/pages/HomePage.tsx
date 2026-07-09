@@ -7,6 +7,7 @@ import {
   Briefcase,
   FolderOpen,
   Pencil,
+  Settings2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -125,10 +126,20 @@ export function HomePage() {
       <header className="border-b border-border/80 bg-card/70 backdrop-blur">
         <div className="flex w-full items-center justify-between gap-3 px-3 py-3 sm:px-5 sm:py-4 lg:px-8">
           <SheafWordmark />
-          <div className="hidden text-[12px] text-muted sm:block">
-            Local casefile
-            <span className="mx-1.5 text-faint">·</span>
-            <span className="font-mono text-faint">127.0.0.1</span>
+          <div className="flex items-center gap-2">
+            <div className="hidden text-[12px] text-muted sm:block">
+              Local casefile
+              <span className="mx-1.5 text-faint">·</span>
+              <span className="font-mono text-faint">127.0.0.1</span>
+            </div>
+            <Link
+              to="/settings"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] text-muted hover:bg-elevated/50 hover:text-foreground"
+              title="Settings"
+            >
+              <Settings2 className="size-3.5" />
+              <span className="hidden sm:inline">Settings</span>
+            </Link>
           </div>
         </div>
       </header>
