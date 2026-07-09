@@ -1,22 +1,45 @@
-# Sheaf
+<p align="center">
+  <img src="docs/assets/logo.png" alt="Sheaf" width="148" height="148" />
+</p>
 
-**Local-first engagement OS** for authorized pentests.
+<h1 align="center">Sheaf</h1>
 
-Bind tool output into findings, evidence, and client-ready reports. Everything stays on your disk under `./.sheaf/`. No cloud, no multi-tenant SaaS.
+<p align="center">
+  <strong>Local-first engagement OS</strong> for authorized pentests.<br/>
+  Bind tool output into findings, evidence, and client-ready reports — data stays on your disk.
+</p>
 
-```text
-Engagement → Scope / ROE → Assets → Runs → Evidence → Findings → Report
-```
+<p align="center">
+  <a href="https://github.com/rqms40/sheaf/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rqms40/sheaf/ci.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-TBD-lightgrey?style=flat-square" alt="License" /></a>
+  <a href="#stack"><img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen?style=flat-square" alt="Node" /></a>
+  <a href="#stack"><img src="https://img.shields.io/badge/pnpm-11-blue?style=flat-square" alt="pnpm" /></a>
+  <a href="#security-notes"><img src="https://img.shields.io/badge/bind-127.0.0.1-orange?style=flat-square" alt="Local only" /></a>
+</p>
+
+<p align="center">
+  <code>Engagement → Scope / ROE → Assets → Runs → Evidence → Findings → Report</code>
+</p>
+
+---
+
+## Why Sheaf?
+
+Most tools are either scanners or report writers. Sheaf sits in the middle as a **casefile**: scope and ROE, imports from nuclei/nmap/httpx/ffuf/Burp, triage with evidence and edit history, then Markdown / paper HTML / DOCX export.
+
+No cloud. No multi-tenant SaaS. Workspace lives under `./.sheaf/` (SQLite + evidence files).
 
 ## Features
 
-- **Casefile** — engagements, include/exclude scope, ROE & notes, methodology checklist
-- **Imports** — nuclei JSONL, nmap XML, httpx JSONL, ffuf JSON, Burp issues XML
-- **Findings** — severity/status triage, soft archive, templates, evidence attach
-- **History** — append-only finding revisions (create / edit / restore)
-- **Report** — structured Markdown, paper HTML (print-friendly), DOCX, JSON package
-- **Runs** — spawn tools on `PATH` and auto-import (authorized targets only)
-- **Console** — local job console (`bash -lc` over WebSocket, **127.0.0.1 only** — not a full PTY)
+| Area | What you get |
+|------|----------------|
+| **Casefile** | Engagements, include/exclude scope, ROE & notes, methodology checklist |
+| **Imports** | nuclei JSONL, nmap XML, httpx JSONL, ffuf JSON, Burp issues XML |
+| **Findings** | Severity/status triage, soft archive, templates, evidence attach |
+| **History** | Append-only revisions (create / edit / restore) |
+| **Report** | Structured Markdown, paper HTML (print-friendly), DOCX, JSON package — screenshots embed in the report |
+| **Runs** | Spawn tools on `PATH` and auto-import (authorized targets only) |
+| **Console** | Local job console (`bash -lc` over WebSocket, **127.0.0.1 only** — not a full PTY) |
 
 ## Stack
 
@@ -28,7 +51,7 @@ Engagement → Scope / ROE → Assets → Runs → Evidence → Findings → Rep
 | CLI | Commander |
 | Tests | Vitest, Playwright Chromium |
 
-Monorepo: `apps/web`, `apps/api`, `packages/core`, `packages/cli`.
+Monorepo: `apps/web` · `apps/api` · `packages/core` · `packages/cli`
 
 ## Requirements
 
