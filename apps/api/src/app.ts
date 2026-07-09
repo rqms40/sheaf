@@ -294,7 +294,23 @@ export function createApp(getWorkspace: () => Workspace) {
   });
 
   app.get("/api/engagements/:id/timeline", (c) => {
-    return c.json({ data: listTimeline(c.get("workspace"), c.req.param("id")) });
+    const limitRaw = Number(c.req.query("limit") || 50);
+    const offsetRaw = Number(c.req.query("offset") || 0);
+    const limit = Number.isFinite(limitRaw) ? limitRaw : 50;
+    const offset = Number.isFinite(offsetRaw) ? offsetRaw : 0;
+    const page = listTimeline(c.get("workspace"), c.req.param("id"), {
+      limit,
+      offset,
+    });
+    return c.json({
+      data: page.items,
+      meta: {
+        total: page.total,
+        limit: page.limit,
+        offset: page.offset,
+        hasMore: page.hasMore,
+      },
+    });
   });
 
   app.get("/api/engagements/:id/evidence", (c) => {

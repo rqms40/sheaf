@@ -254,8 +254,24 @@ export const api = {
     request<{ ok: boolean }>(`/api/engagements/${id}/findings/${fid}`, {
       method: "DELETE",
     }),
-  listTimeline: (id: string) =>
-    request<{ data: TimelineEvent[] }>(`/api/engagements/${id}/timeline`),
+  listTimeline: (
+    id: string,
+    opts?: { limit?: number; offset?: number },
+  ) => {
+    const sp = new URLSearchParams();
+    if (opts?.limit != null) sp.set("limit", String(opts.limit));
+    if (opts?.offset != null) sp.set("offset", String(opts.offset));
+    const qs = sp.toString();
+    return request<{
+      data: TimelineEvent[];
+      meta: {
+        total: number;
+        limit: number;
+        offset: number;
+        hasMore: boolean;
+      };
+    }>(`/api/engagements/${id}/timeline${qs ? `?${qs}` : ""}`);
+  },
   listRuns: (id: string) =>
     request<{ data: Run[] }>(`/api/engagements/${id}/runs`),
   listAssets: (id: string) =>

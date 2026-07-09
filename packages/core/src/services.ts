@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import * as schema from "./db/schema.js";
 import { newId, nowMs } from "./ids.js";
 import {
@@ -503,14 +503,48 @@ export function listAssets(ws: Workspace, engagementId: string) {
     }));
 }
 
-export function listTimeline(ws: Workspace, engagementId: string, limit = 100) {
-  return ws.db
+export type TimelinePage = {
+  items: (typeof schema.timelineEvents.$inferSelect)[];
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+};
+
+/**
+ * Paginated timeline (newest first). Caps page size to avoid huge responses.
+ */
+export function listTimeline(
+  ws: Workspace,
+  engagementId: string,
+  opts?: { limit?: number; offset?: number },
+): TimelinePage {
+  const limit = Math.min(Math.max(opts?.limit ?? 50, 1), 200);
+  const offset = Math.max(opts?.offset ?? 0, 0);
+
+  const countRow = ws.db
+    .select({ n: count() })
+    .from(schema.timelineEvents)
+    .where(eq(schema.timelineEvents.engagementId, engagementId))
+    .get();
+  const total = Number(countRow?.n ?? 0);
+
+  const items = ws.db
     .select()
     .from(schema.timelineEvents)
     .where(eq(schema.timelineEvents.engagementId, engagementId))
     .orderBy(desc(schema.timelineEvents.createdAt))
     .limit(limit)
+    .offset(offset)
     .all();
+
+  return {
+    items,
+    total,
+    limit,
+    offset,
+    hasMore: offset + items.length < total,
+  };
 }
 
 export function addTimeline(
@@ -1499,7 +1533,7 @@ export function buildExportPackage(
   const evidence = listEvidence(ws, engagementId);
   const assets = listAssets(ws, engagementId);
   const runs = listRuns(ws, engagementId);
-  const timeline = listTimeline(ws, engagementId, 500);
+  const timeline = listTimeline(ws, engagementId, { limit: 500 }).items;
   const markdown = buildReport(ws, engagementId, {
     visibility: options.visibility ?? "active",
     confirmedOnly: options.confirmedOnly,
