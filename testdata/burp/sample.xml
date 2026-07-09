@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<issues burpVersion="2024.1" exportTime="Thu Jan 01 12:00:00 UTC 2026">
+  <issue>
+    <serialNumber>1</serialNumber>
+    <type>2097920</type>
+    <name>SQL injection</name>
+    <host ip="10.0.0.5">https://app.lab.local</host>
+    <path>/login</path>
+    <location>https://app.lab.local/login</location>
+    <severity>High</severity>
+    <confidence>Certain</confidence>
+    <issueBackground>SQL injection may allow data extraction.</issueBackground>
+    <issueDetail>The password parameter appears vulnerable.</issueDetail>
+    <remediationBackground>Use parameterized queries.</remediationBackground>
+    <requestresponse>
+      <request base64="false"><![CDATA[POST /login HTTP/1.1
+Host: app.lab.local
+
+user=admin&password=1']]></request>
+      <response base64="false"><![CDATA[HTTP/1.1 500 Internal Server Error
+Content-Type: text/html
+
+error near ']]></response>
+    </requestresponse>
+  </issue>
+</issues>

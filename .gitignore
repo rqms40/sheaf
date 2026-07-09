@@ -16,3 +16,6 @@ apps/web/dist
 packages/*/dist
 apps/api/dist
 *.tsbuildinfo
+test-results
+playwright-report
+playwright/.cache

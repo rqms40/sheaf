@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { Download, FileJson, FileOutput, FileType, RefreshCw } from "lucide-react";
+import DOMPurify from "dompurify";
+import { Download, FileJson, FileOutput, FileType, Printer, RefreshCw } from "lucide-react";
+import { marked } from "marked";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/sheaf/EmptyState";
@@ -16,6 +18,18 @@ import {
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { downloadJson, downloadText, slugFile } from "@/lib/download";
+
+marked.setOptions({
+  gfm: true,
+  breaks: false,
+});
+
+function renderReportHtml(markdown: string): string {
+  const raw = marked.parse(markdown, { async: false }) as string;
+  return DOMPurify.sanitize(raw, {
+    USE_PROFILES: { html: true },
+  });
+}
 
 export function ReportPage() {
   const { engagementId } = useParams({ strict: false }) as { engagementId: string };
@@ -35,33 +49,9 @@ export function ReportPage() {
 
   const baseName = slugFile(eng.data?.data.name || engagementId.slice(0, 8));
 
-  const htmlish = useMemo(() => {
+  const html = useMemo(() => {
     if (!data) return "";
-    return data
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/^#### (.*)$/gm, "<h3>$1</h3>")
-      .replace(/^### (.*)$/gm, "<h3>$1</h3>")
-      .replace(/^## (.*)$/gm, "<h2>$1</h2>")
-      .replace(/^# (.*)$/gm, "<h1>$1</h1>")
-      .replace(/^&gt; (.*)$/gm, "<p class='opacity-70 text-[0.92em]'>$1</p>")
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/^\| (.+) \|$/gm, (row) => {
-        if (row.includes("---")) return "";
-        const cells = row
-          .trim()
-          .replace(/^\|/, "")
-          .replace(/\|$/, "")
-          .split("|")
-          .map((c) => c.trim());
-        return `<div class="font-mono text-[12px] opacity-80">${cells.join(" · ")}</div>`;
-      })
-      .replace(/^_([^_]+)_$/gm, "<em class='text-[0.95em] opacity-80'>$1</em>")
-      .replace(/^\- (.*)$/gm, "<div class='ml-1'>• $1</div>")
-      .replace(/```http\n([\s\S]*?)```/g, "<pre class='text-[11px] overflow-auto bg-black/5 p-2 rounded'>$1</pre>")
-      .replace(/\n\n/g, "<br/><br/>");
+    return renderReportHtml(data);
   }, [data]);
 
   function downloadMd() {
@@ -105,14 +95,18 @@ export function ReportPage() {
     }
   }
 
+  function printReport() {
+    window.print();
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-border px-3 py-3 sm:px-5 lg:px-6">
+      <div className="report-toolbar shrink-0 border-b border-border px-3 py-3 sm:px-5 lg:px-6">
         <PageHeader
           className="mb-0"
           eyebrow="Deliverable"
           title="Report"
-          description="Client-ready Markdown draft from the casefile. Refresh after saving findings."
+          description="Client-ready draft rendered as paper. ROE, scope, severity tables, and findings."
           actions={
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
               <div className="flex items-center gap-2">
@@ -140,6 +134,10 @@ export function ReportPage() {
                   <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
                   <span className="hidden xs:inline sm:inline">Refresh</span>
                 </Button>
+                <Button variant="secondary" size="sm" onClick={printReport} disabled={!data}>
+                  <Printer className="size-3.5" />
+                  <span className="hidden sm:inline">Print</span>
+                </Button>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -162,7 +160,7 @@ export function ReportPage() {
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-background/80 p-3 pb-16 sm:p-6">
+      <div className="report-scroll min-h-0 flex-1 overflow-y-auto bg-background/80 p-3 pb-16 sm:p-6">
         {isLoading && <div className="text-muted">Generating…</div>}
         {error && (
           <EmptyState
@@ -173,8 +171,9 @@ export function ReportPage() {
         )}
         {data && (
           <article
-            className="paper-surface w-full max-w-4xl rounded-sm px-4 py-6 text-[13px] leading-relaxed sm:mx-auto sm:px-10 sm:py-10 sm:text-[14px]"
-            dangerouslySetInnerHTML={{ __html: htmlish }}
+            className="report-paper paper-surface w-full max-w-3xl rounded-sm px-5 py-8 text-[14px] leading-[1.65] sm:mx-auto sm:px-12 sm:py-12 sm:text-[15px]"
+            data-testid="report-paper"
+            dangerouslySetInnerHTML={{ __html: html }}
           />
         )}
       </div>

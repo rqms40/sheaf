@@ -7,6 +7,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import {
+  Activity,
   Archive,
   ArchiveRestore,
   Bug,
@@ -19,7 +20,7 @@ import {
   ListChecks,
   Menu,
   Pencil,
-  Terminal,
+  SquareTerminal,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -49,14 +50,18 @@ import { api } from "@/lib/api";
 import { downloadJson, downloadText, slugFile } from "@/lib/download";
 import { cn } from "@/lib/utils";
 
+/** Full nav: desktop header + mobile sidebar. Bottom bar uses primary only. */
 const nav = [
-  { to: "findings", label: "Findings", icon: Bug },
-  { to: "scope", label: "Scope", icon: Crosshair },
-  { to: "runs", label: "Runs", icon: Terminal },
-  { to: "checklist", label: "Checklist", icon: ListChecks },
-  { to: "timeline", label: "Timeline", icon: History },
-  { to: "report", label: "Report", icon: FileOutput },
+  { to: "findings", label: "Findings", icon: Bug, primary: true },
+  { to: "scope", label: "Scope", icon: Crosshair, primary: true },
+  { to: "runs", label: "Runs", icon: Activity, primary: false },
+  { to: "console", label: "Console", icon: SquareTerminal, primary: false },
+  { to: "checklist", label: "Checklist", icon: ListChecks, primary: true },
+  { to: "timeline", label: "Timeline", icon: History, primary: false },
+  { to: "report", label: "Report", icon: FileOutput, primary: true },
 ] as const;
+
+const bottomNav = nav.filter((item) => item.primary);
 
 export function EngagementLayout() {
   const { engagementId } = useParams({ strict: false }) as { engagementId: string };
@@ -326,9 +331,12 @@ export function EngagementLayout() {
             aria-label="Close menu"
             onClick={() => setMobileNav(false)}
           />
-          <nav className="fixed bottom-14 left-0 top-12 z-40 flex w-[min(100%,280px)] flex-col overflow-y-auto border-r border-border bg-card p-2 shadow-xl md:hidden">
+          <nav
+            className="fixed bottom-14 left-0 top-12 z-40 flex w-[min(100%,280px)] flex-col overflow-y-auto border-r border-border bg-card p-2 shadow-xl md:hidden"
+            data-testid="mobile-sidebar"
+          >
             <div className="mb-2 px-2 py-1 text-[11px] uppercase tracking-wide text-faint">
-              Navigate
+              All pages
             </div>
             {nav.map((item) => navLink(item, { mobile: true }))}
             <Separator className="my-2" />
@@ -370,8 +378,12 @@ export function EngagementLayout() {
         <Outlet />
       </div>
 
-      <nav className="z-20 flex shrink-0 items-stretch justify-around border-t border-border bg-card/95 px-0.5 py-0.5 pb-[max(0.25rem,env(safe-area-inset-bottom))] md:hidden">
-        {nav.map((item) => navLink(item, { bottom: true }))}
+      <nav
+        className="z-20 flex shrink-0 items-stretch justify-around border-t border-border bg-card/95 px-0.5 py-0.5 pb-[max(0.25rem,env(safe-area-inset-bottom))] md:hidden"
+        data-testid="mobile-bottom-nav"
+        aria-label="Primary navigation"
+      >
+        {bottomNav.map((item) => navLink(item, { bottom: true }))}
       </nav>
 
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>

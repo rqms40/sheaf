@@ -9,6 +9,8 @@ type Engagement = {
   status: string;
   startAt: number | null;
   endAt: number | null;
+  roeText?: string | null;
+  notesText?: string | null;
 };
 
 type Finding = {
@@ -175,9 +177,10 @@ export function renderMarkdownReport(input: {
   lines.push("");
   lines.push("1. [Executive summary](#executive-summary)");
   lines.push("2. [Severity overview](#severity-overview)");
-  lines.push("3. [Scope](#scope)");
-  if (assets.length) lines.push("4. [Assets](#assets)");
-  if (runs.length) lines.push(`${assets.length ? "5" : "4"}. [Testing activity](#testing-activity)`);
+  lines.push("3. [Rules of engagement](#rules-of-engagement)");
+  lines.push("4. [Scope](#scope)");
+  if (assets.length) lines.push("5. [Assets](#assets)");
+  if (runs.length) lines.push(`${assets.length ? "6" : "5"}. [Testing activity](#testing-activity)`);
   lines.push("- [Findings](#findings)");
   lines.push("- [Appendix: evidence index](#appendix-evidence-index)");
   lines.push("");
@@ -210,6 +213,25 @@ export function renderMarkdownReport(input: {
     for (const [st, n] of [...statusCounts.entries()].sort((a, b) => b[1] - a[1])) {
       lines.push(`| ${statusLabel(st)} | ${n} |`);
     }
+    lines.push("");
+  }
+
+  // Rules of engagement / ROE
+  lines.push("## Rules of engagement");
+  lines.push("");
+  if (engagement.roeText?.trim()) {
+    lines.push(engagement.roeText.trim());
+    lines.push("");
+  } else {
+    lines.push(
+      "_No rules of engagement notes were recorded in Sheaf. Paste ROE constraints (hours, excluded hosts, rate limits, notification rules) on the Scope page before delivery._",
+    );
+    lines.push("");
+  }
+  if (engagement.notesText?.trim()) {
+    lines.push("### Engagement notes");
+    lines.push("");
+    lines.push(engagement.notesText.trim());
     lines.push("");
   }
 

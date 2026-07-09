@@ -45,6 +45,7 @@ pnpm sheaf -- import nuclei ./scan.jsonl -e <id>
 pnpm sheaf -- import nmap ./scan.xml -e <id>
 pnpm sheaf -- import httpx ./httpx.jsonl -e <id>
 pnpm sheaf -- import ffuf ./ffuf.json -e <id>
+pnpm sheaf -- import burp ./issues.xml -e <id>
 pnpm sheaf -- run -e <id> -t nuclei -- -u https://target
 pnpm sheaf -- checklist list -e <id>
 pnpm sheaf -- finding archive <fid> -e <id>
@@ -59,10 +60,21 @@ pnpm sheaf -- serve --port 7420
 
 Workspace data: `./.sheaf/` (SQLite + evidence).
 
+## Engagement OS features
+
+- **Lifecycle:** engagement → scope/ROE → assets → runs → evidence → findings → report
+- **Imports:** nuclei JSONL, nmap XML, httpx JSONL, ffuf JSON, Burp issues XML
+- **Report:** GFM markdown → paper HTML (marked + DOMPurify), print CSS, DOCX, package export
+- **Console:** local job console (`bash -lc` over WebSocket on `127.0.0.1` only — not a full PTY; XSS ≈ shell)
+
+See [docs/engagement-os-research.md](docs/engagement-os-research.md) for design notes.
+
 ## Tests
 
 ```bash
-pnpm test
+pnpm test          # unit (importers)
+pnpm test:e2e      # build + Playwright Chromium
+pnpm ci            # test + typecheck + build + e2e
 ```
 
 ## Production UI
@@ -72,7 +84,7 @@ pnpm --filter @sheaf/web build
 pnpm sheaf -- serve
 ```
 
-Serves API + built UI on `http://127.0.0.1:7420`.
+Serves API + built UI on `http://127.0.0.1:7420`. Prefer loopback; never expose the console on a network interface.
 
 ## Docs
 

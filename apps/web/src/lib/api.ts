@@ -6,6 +6,8 @@ export type Engagement = {
   status: string;
   startAt: number | null;
   endAt: number | null;
+  roeText?: string | null;
+  notesText?: string | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -82,6 +84,30 @@ export type Asset = {
     state: string;
     service?: string;
   }>;
+};
+
+export type FindingRevision = {
+  id: string;
+  engagementId: string;
+  findingId: string;
+  revision: number;
+  source: "create" | "edit" | "import" | "archive" | "restore" | "status";
+  summary: string;
+  snapshot: {
+    title: string;
+    severity: string;
+    status: string;
+    host: string | null;
+    path: string | null;
+    description: string | null;
+    impact: string | null;
+    remediation: string | null;
+    cwe: string | null;
+    cve: string | null;
+    references: string[];
+  };
+  changes: Record<string, { from: unknown; to: unknown }>;
+  createdAt: number;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -233,6 +259,14 @@ export const api = {
         body: JSON.stringify({ content, sourcePath }),
       },
     ),
+  importBurp: (id: string, content: string, sourcePath?: string) =>
+    request<{ data: { created: number; updated: number; runId: string } }>(
+      `/api/engagements/${id}/import/burp`,
+      {
+        method: "POST",
+        body: JSON.stringify({ content, sourcePath }),
+      },
+    ),
   uploadEvidence: (
     id: string,
     body: {
@@ -284,6 +318,15 @@ export const api = {
     request<{
       data: { ok: boolean; statusCode?: number; error?: string; url?: string };
     }>(`/api/engagements/${id}/findings/${fid}/probe`, { method: "POST", body: "{}" }),
+  listFindingHistory: (id: string, fid: string) =>
+    request<{ data: FindingRevision[] }>(
+      `/api/engagements/${id}/findings/${fid}/history`,
+    ),
+  restoreFindingRevision: (id: string, fid: string, revisionId: string) =>
+    request<{ data: Finding }>(
+      `/api/engagements/${id}/findings/${fid}/history/${revisionId}/restore`,
+      { method: "POST", body: "{}" },
+    ),
   reportMarkdown: (
     id: string,
     opts?: { confirmedOnly?: boolean; visibility?: "active" | "archived" | "all" },

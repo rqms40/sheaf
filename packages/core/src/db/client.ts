@@ -22,6 +22,8 @@ export function migrate(sqlite: Database.Database): void {
       status TEXT NOT NULL DEFAULT 'active',
       start_at INTEGER,
       end_at INTEGER,
+      roe_text TEXT,
+      notes_text TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -127,5 +129,36 @@ export function migrate(sqlite: Database.Database): void {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS checklist_engagement_key_uidx
       ON checklist_items(engagement_id, item_key);
+
+    CREATE TABLE IF NOT EXISTS finding_revisions (
+      id TEXT PRIMARY KEY,
+      engagement_id TEXT NOT NULL REFERENCES engagements(id) ON DELETE CASCADE,
+      finding_id TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL,
+      source TEXT NOT NULL DEFAULT 'edit',
+      summary TEXT NOT NULL,
+      snapshot_json TEXT NOT NULL,
+      changes_json TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS finding_revisions_finding_rev_uidx
+      ON finding_revisions(finding_id, revision);
+    CREATE INDEX IF NOT EXISTS finding_revisions_finding_created_idx
+      ON finding_revisions(finding_id, created_at);
+    CREATE INDEX IF NOT EXISTS finding_revisions_engagement_idx
+      ON finding_revisions(engagement_id);
   `);
+
+  // Additive columns for older workspaces (SQLite ignores if already present via try/catch)
+  const alters = [
+    "ALTER TABLE engagements ADD COLUMN roe_text TEXT",
+    "ALTER TABLE engagements ADD COLUMN notes_text TEXT",
+  ];
+  for (const sql of alters) {
+    try {
+      sqlite.exec(sql);
+    } catch {
+      // column exists
+    }
+  }
 }

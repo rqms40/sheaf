@@ -18,6 +18,7 @@ import {
   getEngagement,
   getFinding,
   getFindingTemplate,
+  importBurp,
   importFfuf,
   importHttpx,
   importNmap,
@@ -26,6 +27,7 @@ import {
   listChecklist,
   listEngagements,
   listEvidence,
+  listFindingHistory,
   listFindingTemplates,
   listFindings,
   listNotes,
@@ -33,6 +35,7 @@ import {
   listScope,
   listTimeline,
   probeFinding,
+  restoreFindingRevision,
   runToolAndImport,
   saveEvidenceFile,
   setChecklistItem,
@@ -219,6 +222,27 @@ export function createApp(getWorkspace: () => Workspace) {
     return c.json({ data: row });
   });
 
+  app.get("/api/engagements/:id/findings/:fid/history", (c) => {
+    const data = listFindingHistory(
+      c.get("workspace"),
+      c.req.param("id"),
+      c.req.param("fid"),
+    );
+    if (!data) return jsonError(c, 404, "not_found", "Finding not found");
+    return c.json({ data });
+  });
+
+  app.post("/api/engagements/:id/findings/:fid/history/:rid/restore", (c) => {
+    const row = restoreFindingRevision(
+      c.get("workspace"),
+      c.req.param("id"),
+      c.req.param("fid"),
+      c.req.param("rid"),
+    );
+    if (!row) return jsonError(c, 404, "not_found", "Revision or finding not found");
+    return c.json({ data: row });
+  });
+
   app.get("/api/engagements/:id/runs", (c) => {
     return c.json({ data: listRuns(c.get("workspace"), c.req.param("id")) });
   });
@@ -326,6 +350,25 @@ export function createApp(getWorkspace: () => Workspace) {
       if (!content.trim()) return jsonError(c, 400, "validation_error", "content required");
       try {
         const result = importFfuf(c.get("workspace"), c.req.param("id"), content, sourcePath);
+        return c.json({ data: result });
+      } catch (e) {
+        return jsonError(c, 400, "import_error", e instanceof Error ? e.message : "import failed");
+      }
+    },
+  );
+
+  app.post(
+    "/api/engagements/:id/import/burp",
+    bodyLimit({ maxSize: 50 * 1024 * 1024 }),
+    async (c) => {
+      if (!getEngagement(c.get("workspace"), c.req.param("id")))
+        return jsonError(c, 404, "not_found", "Engagement not found");
+      const body = await c.req.json();
+      const content = String(body.content ?? "");
+      const sourcePath = body.sourcePath ? String(body.sourcePath) : undefined;
+      if (!content.trim()) return jsonError(c, 400, "validation_error", "content required");
+      try {
+        const result = importBurp(c.get("workspace"), c.req.param("id"), content, sourcePath);
         return c.json({ data: result });
       } catch (e) {
         return jsonError(c, 400, "import_error", e instanceof Error ? e.message : "import failed");

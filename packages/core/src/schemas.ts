@@ -66,6 +66,8 @@ export const UpdateEngagementInput = z.object({
   status: EngagementStatus.optional(),
   startAt: z.number().optional().nullable(),
   endAt: z.number().optional().nullable(),
+  roeText: z.string().optional().nullable(),
+  notesText: z.string().optional().nullable(),
 });
 export type UpdateEngagementInput = z.infer<typeof UpdateEngagementInput>;
 

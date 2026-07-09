@@ -8,6 +8,8 @@ export const engagements = sqliteTable("engagements", {
   status: text("status").notNull().default("active"),
   startAt: integer("start_at"),
   endAt: integer("end_at"),
+  roeText: text("roe_text"),
+  notesText: text("notes_text"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
@@ -144,4 +146,37 @@ export const checklistItems = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (t) => [uniqueIndex("checklist_engagement_key_uidx").on(t.engagementId, t.itemKey)],
+);
+
+/**
+ * Append-only edit history for findings (Word-style version trail).
+ * Each row is a complete snapshot after a change, plus field-level diffs.
+ * revision is monotonic per finding (1 = created).
+ */
+export const findingRevisions = sqliteTable(
+  "finding_revisions",
+  {
+    id: text("id").primaryKey(),
+    engagementId: text("engagement_id")
+      .notNull()
+      .references(() => engagements.id, { onDelete: "cascade" }),
+    findingId: text("finding_id")
+      .notNull()
+      .references(() => findings.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull(),
+    /** create | edit | import | archive | restore | status */
+    source: text("source").notNull().default("edit"),
+    /** Short human summary, e.g. "status draft → confirmed" */
+    summary: text("summary").notNull(),
+    /** Full finding fields after this revision */
+    snapshotJson: text("snapshot_json").notNull(),
+    /** { field: { from, to } } — empty object for create */
+    changesJson: text("changes_json").notNull().default("{}"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("finding_revisions_finding_rev_uidx").on(t.findingId, t.revision),
+    index("finding_revisions_finding_created_idx").on(t.findingId, t.createdAt),
+    index("finding_revisions_engagement_idx").on(t.engagementId),
+  ],
 );

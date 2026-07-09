@@ -11,10 +11,14 @@
     "build": "pnpm --filter @sheaf/core build && pnpm --filter @sheaf/web build",
     "test": "pnpm --filter @sheaf/core test",
     "typecheck": "pnpm -r --if-present typecheck",
-    "ci": "pnpm test && pnpm typecheck && pnpm build",
+    "test:e2e": "pnpm build && playwright test",
+    "ci": "pnpm test && pnpm typecheck && pnpm build && playwright test",
     "sheaf": "pnpm --filter @sheaf/cli start"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }

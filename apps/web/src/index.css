@@ -87,43 +87,174 @@ body::before {
 }
 
 .paper-surface {
-  background: var(--color-paper);
+  background:
+    linear-gradient(180deg, #f3efe6 0%, var(--color-paper) 12%, #e8e2d6 100%);
   color: var(--color-paper-ink);
   font-family: var(--font-serif);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.4) inset,
-    0 18px 40px rgba(0, 0, 0, 0.35);
+    0 1px 0 rgba(255, 255, 255, 0.45) inset,
+    0 0 0 1px rgba(40, 32, 20, 0.06),
+    0 22px 48px rgba(0, 0, 0, 0.38);
 }
 
 .paper-surface h1 {
-  font-size: 1.55rem;
-  font-weight: 600;
-  margin: 0 0 0.75rem;
-  letter-spacing: -0.02em;
+  font-size: 1.65rem;
+  font-weight: 650;
+  margin: 0 0 0.65rem;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: #141618;
 }
 .paper-surface h2 {
-  font-size: 1.15rem;
-  font-weight: 600;
-  margin: 1.4rem 0 0.5rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--color-paper-ink) 12%, transparent);
-  padding-bottom: 0.25rem;
+  font-size: 1.12rem;
+  font-weight: 650;
+  margin: 1.65rem 0 0.55rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-paper-ink) 14%, transparent);
+  padding-bottom: 0.3rem;
+  letter-spacing: -0.01em;
+  color: #1a1c1e;
 }
 .paper-surface h3 {
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 600;
-  margin: 1rem 0 0.35rem;
+  margin: 1.15rem 0 0.4rem;
+  color: #22252a;
+}
+.paper-surface p {
+  margin: 0 0 0.75rem;
+}
+.paper-surface blockquote {
+  margin: 0.5rem 0 1rem;
+  padding: 0.35rem 0 0.35rem 0.85rem;
+  border-left: 3px solid color-mix(in oklab, #8b6914 55%, transparent);
+  color: color-mix(in oklab, var(--color-paper-ink) 72%, #5c5346);
+  font-style: italic;
+}
+.paper-surface ul,
+.paper-surface ol {
+  margin: 0 0 0.85rem;
+  padding-left: 1.35rem;
+}
+.paper-surface li {
+  margin: 0.2rem 0;
+}
+.paper-surface strong {
+  font-weight: 650;
+  color: #121416;
+}
+.paper-surface a {
+  color: #6b4f2a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.paper-surface hr {
+  border: 0;
+  border-top: 1px solid color-mix(in oklab, var(--color-paper-ink) 12%, transparent);
+  margin: 1.25rem 0;
+}
+.paper-surface table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.88em;
+  line-height: 1.4;
+}
+.paper-surface th,
+.paper-surface td {
+  border: 1px solid color-mix(in oklab, var(--color-paper-ink) 14%, transparent);
+  padding: 0.4rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+}
+.paper-surface th {
+  background: color-mix(in oklab, var(--color-paper-ink) 5%, transparent);
+  font-weight: 600;
+  font-size: 0.82em;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--color-paper-ink) 78%, #000);
+}
+.paper-surface tr:nth-child(even) td {
+  background: color-mix(in oklab, var(--color-paper-ink) 2.5%, transparent);
 }
 .paper-surface code {
   font-family: var(--font-mono);
-  font-size: 0.85em;
+  font-size: 0.84em;
   background: color-mix(in oklab, var(--color-paper-ink) 6%, transparent);
-  padding: 0.05em 0.3em;
+  padding: 0.08em 0.32em;
   border-radius: 3px;
 }
-.paper-surface pre,
-.paper-surface code {
+.paper-surface pre {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  background: #1c1f24;
+  color: #e6e9ef;
+  padding: 0.75rem 0.9rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.5rem 0 1rem;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+.paper-surface pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* Finding revision ledger — casefile spine */
+.history-ledger-item:last-child .history-ledger-spine {
+  display: none;
+}
+
+/* Terminal job console — phosphor on deep slate */
+.console-surface {
+  background:
+    radial-gradient(900px 280px at 10% 0%, rgba(120, 160, 100, 0.06), transparent 55%),
+    #0c100e;
+  color: #c8d6c0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+@media print {
+  body::before {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .report-toolbar,
+  header,
+  nav,
+  .report-toolbar ~ * button {
+    display: none !important;
+  }
+  .report-scroll {
+    overflow: visible !important;
+    background: white !important;
+    padding: 0 !important;
+  }
+  .report-paper,
+  .paper-surface {
+    max-width: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .paper-surface pre {
+    background: #f4f4f4 !important;
+    color: #111 !important;
+    border: 1px solid #ccc;
+  }
+  .paper-surface a {
+    color: black !important;
+    text-decoration: none !important;
+  }
 }
 
 .eyebrow {

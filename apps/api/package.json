@@ -17,10 +17,12 @@
     "@hono/node-server": "^1.14.4",
     "@sheaf/core": "workspace:*",
     "hono": "^4.8.3",
-    "tsx": "^4.20.3"
+    "tsx": "^4.20.3",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.15.32",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.8.3"
   }
 }

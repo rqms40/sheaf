@@ -16,9 +16,18 @@ import { normalizeNucleiFile } from "./importers/nuclei.js";
 import { parseNmapXml } from "./importers/nmap.js";
 import { parseHttpx } from "./importers/httpx.js";
 import { normalizeFfufFile } from "./importers/ffuf.js";
+import { parseBurpIssuesXml } from "./importers/burp.js";
 import { manualFingerprint } from "./fingerprint.js";
 import { renderMarkdownReport } from "./report/markdown.js";
 import { checklistForType } from "./checklist/definitions.js";
+import {
+  deleteFindingRevisions,
+  getFindingRevision,
+  listFindingRevisions,
+  recordFindingRevision,
+  snapshotFromFinding,
+  type FindingRevisionSource,
+} from "./revisions.js";
 import { evidencePathFor, type Workspace } from "./workspace.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -61,6 +70,8 @@ export function createEngagement(ws: Workspace, input: CreateEngagementInput) {
       status: "active",
       startAt: data.startAt ?? null,
       endAt: data.endAt ?? null,
+      roeText: null,
+      notesText: null,
       createdAt: now,
       updatedAt: now,
     })
@@ -82,6 +93,8 @@ export function updateEngagement(ws: Workspace, id: string, input: UpdateEngagem
       status: data.status ?? existing.status,
       startAt: data.startAt === undefined ? existing.startAt : data.startAt,
       endAt: data.endAt === undefined ? existing.endAt : data.endAt,
+      roeText: data.roeText === undefined ? existing.roeText : data.roeText,
+      notesText: data.notesText === undefined ? existing.notesText : data.notesText,
       updatedAt: nowMs(),
     })
     .where(eq(schema.engagements.id, id))
@@ -235,7 +248,16 @@ export function createFinding(ws: Workspace, engagementId: string, input: Create
     })
     .run();
   addTimeline(ws, engagementId, "finding_created", `Finding created: ${data.title}`, "finding", id);
-  return getFinding(ws, engagementId, id)!;
+  const created = getFinding(ws, engagementId, id)!;
+  recordFindingRevision(
+    ws,
+    engagementId,
+    id,
+    "create",
+    null,
+    snapshotFromFinding(created),
+  );
+  return created;
 }
 
 export function updateFinding(
@@ -243,11 +265,13 @@ export function updateFinding(
   engagementId: string,
   findingId: string,
   input: UpdateFindingInput,
+  opts?: { source?: FindingRevisionSource },
 ) {
   const data = UpdateFindingInput.parse(input);
   const existing = getFinding(ws, engagementId, findingId);
   if (!existing) return null;
 
+  const before = snapshotFromFinding(existing);
   const nextStatus = data.status ?? existing.status;
   ws.db
     .update(schema.findings)
@@ -281,14 +305,29 @@ export function updateFinding(
       findingId,
     );
   }
-  return getFinding(ws, engagementId, findingId)!;
+
+  const updated = getFinding(ws, engagementId, findingId)!;
+  const source: FindingRevisionSource =
+    opts?.source ??
+    (data.status === "archived" && existing.status !== "archived"
+      ? "archive"
+      : "edit");
+  recordFindingRevision(
+    ws,
+    engagementId,
+    findingId,
+    source,
+    before,
+    snapshotFromFinding(updated),
+  );
+  return updated;
 }
 
 export function deleteFinding(ws: Workspace, engagementId: string, findingId: string) {
   const existing = getFinding(ws, engagementId, findingId);
   if (!existing) return false;
 
-  // Clean related rows (no FK cascade on finding_id)
+  // Clean related rows (no FK cascade on finding_id for evidence/notes)
   ws.db
     .delete(schema.evidence)
     .where(
@@ -304,6 +343,8 @@ export function deleteFinding(ws: Workspace, engagementId: string, findingId: st
       and(eq(schema.notes.engagementId, engagementId), eq(schema.notes.findingId, findingId)),
     )
     .run();
+  // Revisions first (FK to findings) then finding
+  deleteFindingRevisions(ws, engagementId, findingId);
   ws.db
     .delete(schema.findings)
     .where(and(eq(schema.findings.id, findingId), eq(schema.findings.engagementId, engagementId)))
@@ -317,6 +358,45 @@ export function deleteFinding(ws: Workspace, engagementId: string, findingId: st
     findingId,
   );
   return true;
+}
+
+export function listFindingHistory(ws: Workspace, engagementId: string, findingId: string) {
+  if (!getFinding(ws, engagementId, findingId)) return null;
+  return listFindingRevisions(ws, engagementId, findingId);
+}
+
+/**
+ * Restore a prior snapshot as a new edit (Word-style "restore version").
+ * Appends a new revision; does not rewrite history.
+ */
+export function restoreFindingRevision(
+  ws: Workspace,
+  engagementId: string,
+  findingId: string,
+  revisionId: string,
+) {
+  const rev = getFindingRevision(ws, engagementId, findingId, revisionId);
+  if (!rev) return null;
+  const snap = rev.snapshot;
+  return updateFinding(
+    ws,
+    engagementId,
+    findingId,
+    {
+      title: snap.title,
+      severity: snap.severity as Severity,
+      status: snap.status as FindingStatus,
+      host: snap.host,
+      path: snap.path,
+      description: snap.description,
+      impact: snap.impact,
+      remediation: snap.remediation,
+      cwe: snap.cwe,
+      cve: snap.cve,
+      references: snap.references,
+    },
+    { source: "restore" },
+  );
 }
 
 export function listRuns(ws: Workspace, engagementId: string) {
@@ -841,6 +921,122 @@ export function importFfuf(
     engagementId,
     "import",
     `Imported ffuf (${created} new, ${updated} updated, ${items.length} total)`,
+    "run",
+    runId,
+  );
+  touchEngagement(ws, engagementId);
+  return { runId, created, updated, skipped: 0 };
+}
+
+export function importBurp(
+  ws: Workspace,
+  engagementId: string,
+  raw: string,
+  sourcePath?: string,
+): ImportResult {
+  const items = parseBurpIssuesXml(raw);
+  const now = nowMs();
+  const runId = newId();
+  ws.db
+    .insert(schema.runs)
+    .values({
+      id: runId,
+      engagementId,
+      tool: "other",
+      label: sourcePath ? path.basename(sourcePath) : "burp import",
+      sourcePath: sourcePath ?? null,
+      startedAt: now,
+      finishedAt: now,
+      metaJson: JSON.stringify({ count: items.length, source: "burp" }),
+      createdAt: now,
+    })
+    .run();
+
+  let created = 0;
+  let updated = 0;
+  for (const item of items) {
+    const existing = ws.db
+      .select()
+      .from(schema.findings)
+      .where(
+        and(
+          eq(schema.findings.engagementId, engagementId),
+          eq(schema.findings.fingerprint, item.fingerprint),
+        ),
+      )
+      .get();
+    if (existing) {
+      ws.db
+        .update(schema.findings)
+        .set({
+          runId,
+          title: item.title,
+          severity: item.severity,
+          host: item.host,
+          path: item.path,
+          description: item.description,
+          impact: item.impact,
+          remediation: item.remediation,
+          rawJson: JSON.stringify(item.raw),
+          updatedAt: now,
+        })
+        .where(eq(schema.findings.id, existing.id))
+        .run();
+      updated += 1;
+    } else {
+      const findingId = newId();
+      ws.db
+        .insert(schema.findings)
+        .values({
+          id: findingId,
+          engagementId,
+          runId,
+          title: item.title,
+          severity: item.severity,
+          status: "needs_review",
+          host: item.host,
+          path: item.path,
+          description: item.description,
+          impact: item.impact,
+          remediation: item.remediation,
+          cwe: item.cwe,
+          cve: item.cve,
+          referencesJson: JSON.stringify(item.references),
+          fingerprint: item.fingerprint,
+          rawJson: JSON.stringify(item.raw),
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+      created += 1;
+      if (item.request || item.response) {
+        const content = [
+          item.request ? `=== REQUEST ===\n${item.request}` : "",
+          item.response ? `=== RESPONSE ===\n${item.response}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+        ws.db
+          .insert(schema.evidence)
+          .values({
+            id: newId(),
+            engagementId,
+            findingId,
+            kind: "http",
+            path: null,
+            contentText: content,
+            metaJson: JSON.stringify({ source: "burp" }),
+            createdAt: now,
+          })
+          .run();
+      }
+    }
+  }
+  addTimeline(
+    ws,
+    engagementId,
+    "import",
+    `Imported Burp issues (${created} new, ${updated} updated, ${items.length} total)`,
     "run",
     runId,
   );

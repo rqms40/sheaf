@@ -16,6 +16,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/sheaf/EmptyState";
+import { FindingHistory } from "@/components/sheaf/FindingHistory";
 import { FindingRow } from "@/components/sheaf/FindingRow";
 import { SeverityBadge } from "@/components/sheaf/SeverityBadge";
 import { StatusBadge } from "@/components/sheaf/StatusBadge";
@@ -45,7 +46,7 @@ import { api, type Finding } from "@/lib/api";
 import { readFileAsBase64, readFileAsText } from "@/lib/files";
 import { cn } from "@/lib/utils";
 
-type ImportTool = "nuclei" | "nmap" | "httpx" | "ffuf";
+type ImportTool = "nuclei" | "nmap" | "httpx" | "ffuf" | "burp";
 
 /** Working statuses for edit form (archive is a separate action). */
 const STATUSES = [
@@ -190,7 +191,18 @@ export function FindingsPage() {
     qc.invalidateQueries({ queryKey: ["timeline", engagementId] });
     qc.invalidateQueries({ queryKey: ["runs", engagementId] });
     qc.invalidateQueries({ queryKey: ["evidence", engagementId] });
+    if (selected?.id) {
+      qc.invalidateQueries({
+        queryKey: ["finding-history", engagementId, selected.id],
+      });
+    }
   };
+
+  const historyQuery = useQuery({
+    queryKey: ["finding-history", engagementId, selected?.id],
+    queryFn: () => api.listFindingHistory(engagementId, selected!.id),
+    enabled: !!selected?.id,
+  });
 
   const save = useMutation({
     mutationFn: () => {
@@ -214,6 +226,27 @@ export function FindingsPage() {
       setSavedSnapshot(next);
       toast.success("Finding saved");
       invalidate();
+      qc.invalidateQueries({
+        queryKey: ["finding-history", engagementId, res.data.id],
+      });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const restoreMut = useMutation({
+    mutationFn: (revisionId: string) => {
+      if (!selected) throw new Error("No finding");
+      return api.restoreFindingRevision(engagementId, selected.id, revisionId);
+    },
+    onSuccess: (res) => {
+      const next = toDraft(res.data);
+      setDraft(next);
+      setSavedSnapshot(next);
+      toast.success("Version restored (new revision appended)");
+      invalidate();
+      qc.invalidateQueries({
+        queryKey: ["finding-history", engagementId, res.data.id],
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -247,6 +280,7 @@ export function FindingsPage() {
       if (importKind === "nuclei") return api.importNuclei(engagementId, importText, src);
       if (importKind === "nmap") return api.importNmap(engagementId, importText, src);
       if (importKind === "httpx") return api.importHttpx(engagementId, importText, src);
+      if (importKind === "burp") return api.importBurp(engagementId, importText, src);
       return api.importFfuf(engagementId, importText, src);
     },
     onSuccess: (res) => {
@@ -662,11 +696,14 @@ export function FindingsPage() {
             </div>
 
             <Tabs defaultValue="writeup">
-              <TabsList>
+              <TabsList className="flex h-auto min-h-9 w-full flex-wrap justify-start gap-0.5 sm:w-auto">
                 <TabsTrigger value="writeup">Writeup</TabsTrigger>
                 <TabsTrigger value="meta">Meta</TabsTrigger>
                 <TabsTrigger value="evidence">
                   Evidence ({evidenceQuery.data?.data?.length ?? 0})
+                </TabsTrigger>
+                <TabsTrigger value="history" data-testid="history-tab">
+                  History ({historyQuery.data?.data?.length ?? 0})
                 </TabsTrigger>
               </TabsList>
 
@@ -867,6 +904,22 @@ export function FindingsPage() {
                   />
                 )}
               </TabsContent>
+
+              <TabsContent value="history" className="space-y-3">
+                <FindingHistory
+                  revisions={historyQuery.data?.data ?? []}
+                  loading={historyQuery.isLoading}
+                  restoringId={restoreMut.isPending ? restoreMut.variables : null}
+                  dirty={dirty}
+                  onRestore={(revisionId) => {
+                    if (dirty) {
+                      toast.message("Save or discard changes before restoring");
+                      return;
+                    }
+                    restoreMut.mutate(revisionId);
+                  }}
+                />
+              </TabsContent>
             </Tabs>
           </div>
         )}
@@ -881,7 +934,7 @@ export function FindingsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-wrap gap-2">
-            {(["nuclei", "nmap", "httpx", "ffuf"] as ImportTool[]).map((t) => (
+            {(["nuclei", "nmap", "httpx", "ffuf", "burp"] as ImportTool[]).map((t) => (
               <Button
                 key={t}
                 size="sm"
@@ -907,7 +960,7 @@ export function FindingsPage() {
               ref={importFileRef}
               type="file"
               className="hidden"
-              accept=".json,.jsonl,.xml,.txt"
+              accept=".json,.jsonl,.xml,.txt,application/xml,text/xml"
               onChange={async (e) => {
                 const f = e.target.files?.[0];
                 if (!f) return;

@@ -13,6 +13,7 @@ import { TimelinePage } from "./pages/TimelinePage";
 import { ReportPage } from "./pages/ReportPage";
 import { RunsPage } from "./pages/RunsPage";
 import { ChecklistPage } from "./pages/ChecklistPage";
+import { ConsolePage } from "./pages/ConsolePage";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -77,6 +78,12 @@ const checklistRoute = createRoute({
   component: ChecklistPage,
 });
 
+const consoleRoute = createRoute({
+  getParentRoute: () => engagementRoute,
+  path: "/console",
+  component: ConsolePage,
+});
+
 export const routeTree = rootRoute.addChildren([
   indexRoute,
   engagementRoute.addChildren([
@@ -87,6 +94,7 @@ export const routeTree = rootRoute.addChildren([
     reportRoute,
     runsRoute,
     checklistRoute,
+    consoleRoute,
   ]),
 ]);
 

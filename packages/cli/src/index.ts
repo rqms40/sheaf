@@ -9,6 +9,7 @@ import {
   buildExportPackage,
   createEngagement,
   deleteFinding,
+  importBurp,
   importFfuf,
   importHttpx,
   importNmap,
@@ -218,6 +219,20 @@ imp
     const result = importFfuf(ws, opts.engagement, raw, path.resolve(file));
     console.log(
       `ffuf import complete: ${result.created} new, ${result.updated} updated (run ${result.runId})`,
+    );
+  });
+
+imp
+  .command("burp")
+  .argument("<file>", "Burp issues XML export")
+  .requiredOption("-e, --engagement <id>", "engagement id")
+  .option("-w, --workspace <path>", "workspace root", ".")
+  .action((file: string, opts: { engagement: string; workspace: string }) => {
+    const ws = openWorkspace(path.resolve(opts.workspace));
+    const raw = fs.readFileSync(path.resolve(file), "utf8");
+    const result = importBurp(ws, opts.engagement, raw, path.resolve(file));
+    console.log(
+      `burp import complete: ${result.created} new, ${result.updated} updated (run ${result.runId})`,
     );
   });
 
