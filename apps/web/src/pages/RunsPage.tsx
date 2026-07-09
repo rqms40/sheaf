@@ -79,14 +79,14 @@ export function RunsPage() {
         />
 
         <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-          <Card>
+          <Card className="min-w-0 overflow-hidden">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Terminal className="size-3.5 text-primary" />
                 Runs
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="min-w-0 p-0">
               {runs.isLoading && <div className="px-4 pb-4 text-muted">Loading…</div>}
               {!runs.isLoading && runList.length === 0 && (
                 <div className="px-4 pb-4">
@@ -99,39 +99,49 @@ export function RunsPage() {
                 </div>
               )}
               <ul className="divide-y divide-border">
-                {runList.map((r) => (
-                  <li key={r.id} className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-elevated text-primary border border-border normal-case tracking-normal">
-                        {r.tool}
-                      </Badge>
-                      <span className="text-[13px] font-medium">
-                        {r.label || "import"}
-                      </span>
-                    </div>
-                    <div className="mt-1 text-[12px] text-muted">
-                      {formatTime(r.createdAt)}
-                      {r.sourcePath ? (
-                        <span className="font-mono text-faint"> · {r.sourcePath}</span>
-                      ) : null}
-                    </div>
-                    <div className="mt-1.5 font-mono text-[11px] text-faint">
-                      {JSON.stringify(r.meta)}
-                    </div>
-                  </li>
-                ))}
+                {runList.map((r) => {
+                  const pathBase = r.sourcePath
+                    ? r.sourcePath.split(/[/\\]/).filter(Boolean).pop()
+                    : null;
+                  return (
+                    <li key={r.id} className="min-w-0 px-4 py-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Badge className="shrink-0 bg-elevated text-primary border border-border normal-case tracking-normal">
+                          {r.tool}
+                        </Badge>
+                        <span className="min-w-0 truncate text-[13px] font-medium">
+                          {r.label || "import"}
+                        </span>
+                      </div>
+                      <div className="mt-1 min-w-0 text-[12px] text-muted">
+                        <div>{formatTime(r.createdAt)}</div>
+                        {r.sourcePath ? (
+                          <div
+                            className="mt-0.5 truncate font-mono text-[11px] text-faint"
+                            title={r.sourcePath}
+                          >
+                            {pathBase || r.sourcePath}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="mt-1.5 break-all font-mono text-[11px] text-faint">
+                        {JSON.stringify(r.meta)}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="min-w-0 overflow-hidden">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Server className="size-3.5 text-primary" />
                 Assets
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="min-w-0 p-0">
               {assets.isLoading && <div className="px-4 pb-4 text-muted">Loading…</div>}
               {!assets.isLoading && assetList.length === 0 && (
                 <div className="px-4 pb-4">
@@ -145,8 +155,10 @@ export function RunsPage() {
               )}
               <ul className="divide-y divide-border">
                 {assetList.map((a) => (
-                  <li key={a.id} className="px-4 py-3">
-                    <div className="font-mono text-[13px] text-foreground">{a.host}</div>
+                  <li key={a.id} className="min-w-0 px-4 py-3">
+                    <div className="truncate font-mono text-[13px] text-foreground" title={a.host}>
+                      {a.host}
+                    </div>
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {(a.ports || []).map((p) => (
                         <span
