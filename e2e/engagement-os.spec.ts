@@ -69,7 +69,7 @@ test.describe("Sheaf Engagement OS", () => {
     await expect(page.getByText("local", { exact: true })).toBeVisible({ timeout: 10_000 });
 
     await page.getByTestId("console-input").fill("echo sheaf-console-ok");
-    await page.getByRole("button", { name: "Run" }).click();
+    await page.getByTestId("console-surface").getByRole("button", { name: "Run", exact: true }).click();
     await expect(page.getByTestId("console-surface")).toContainText("sheaf-console-ok", {
       timeout: 15_000,
     });
