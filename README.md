@@ -1,8 +1,34 @@
 # Sheaf
 
-Local-first engagement casefile for offensive security.
+**Local-first engagement OS** for authorized pentests.
 
-Bind tool output into findings, evidence, notes, and reports. Data stays on disk under your control.
+Bind tool output into findings, evidence, and client-ready reports. Everything stays on your disk under `./.sheaf/`. No cloud, no multi-tenant SaaS.
+
+```text
+Engagement → Scope / ROE → Assets → Runs → Evidence → Findings → Report
+```
+
+## Features
+
+- **Casefile** — engagements, include/exclude scope, ROE & notes, methodology checklist
+- **Imports** — nuclei JSONL, nmap XML, httpx JSONL, ffuf JSON, Burp issues XML
+- **Findings** — severity/status triage, soft archive, templates, evidence attach
+- **History** — append-only finding revisions (create / edit / restore)
+- **Report** — structured Markdown, paper HTML (print-friendly), DOCX, JSON package
+- **Runs** — spawn tools on `PATH` and auto-import (authorized targets only)
+- **Console** — local job console (`bash -lc` over WebSocket, **127.0.0.1 only** — not a full PTY)
+
+## Stack
+
+| Layer | Tech |
+|-------|------|
+| Web | React, Vite, TanStack Query/Router, Tailwind |
+| API | Hono on Node, loopback by default |
+| Core | TypeScript, SQLite (better-sqlite3), Zod |
+| CLI | Commander |
+| Tests | Vitest, Playwright Chromium |
+
+Monorepo: `apps/web`, `apps/api`, `packages/core`, `packages/cli`.
 
 ## Requirements
 
@@ -12,101 +38,94 @@ Bind tool output into findings, evidence, notes, and reports. Data stays on disk
 ## Setup
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/rqms40/sheaf.git
 cd sheaf
 pnpm install
-pnpm approve-builds --all   # allow better-sqlite3 / esbuild native builds if prompted
+# if prompted for native builds (better-sqlite3 / esbuild):
+pnpm approve-builds --all
 ```
 
-## Development
+### Dev (UI + API)
 
 ```bash
-# terminal 1 — API (http://127.0.0.1:7420)
+# terminal 1 — API  http://127.0.0.1:7420
 pnpm dev:api
 
-# terminal 2 — UI with proxy (http://127.0.0.1:5173)
+# terminal 2 — UI   http://127.0.0.1:5173  (proxies /api)
 pnpm dev:web
 ```
 
-Or from a workspace directory:
+Or one process after a web build:
+
+```bash
+pnpm build
+pnpm sheaf -- serve -w .
+# → http://127.0.0.1:7420
+```
+
+### CLI
 
 ```bash
 pnpm sheaf -- init
-pnpm sheaf -- serve -w .
-```
-
-## CLI
-
-```bash
-pnpm sheaf -- init [path]
 pnpm sheaf -- engagement create -n acme-web -c Acme
 pnpm sheaf -- engagement list
+
 pnpm sheaf -- import nuclei ./scan.jsonl -e <id>
 pnpm sheaf -- import nmap ./scan.xml -e <id>
 pnpm sheaf -- import httpx ./httpx.jsonl -e <id>
 pnpm sheaf -- import ffuf ./ffuf.json -e <id>
 pnpm sheaf -- import burp ./issues.xml -e <id>
+
 pnpm sheaf -- run -e <id> -t nuclei -- -u https://target
 pnpm sheaf -- checklist list -e <id>
-pnpm sheaf -- finding archive <fid> -e <id>
-pnpm sheaf -- probe -e <id> -f <fid>
+pnpm sheaf -- probe -e <id> -f <findingId>
+
 pnpm sheaf -- report -e <id> -o report.md
 pnpm sheaf -- report -e <id> --docx -o report.docx
 pnpm sheaf -- report -e <id> --confirmed-only -o client.md
 pnpm sheaf -- export -e <id> -o export.json
+
+pnpm sheaf -- finding archive <fid> -e <id>
 pnpm sheaf -- engagement archive <id>
 pnpm sheaf -- serve --port 7420
 ```
 
-Workspace data: `./.sheaf/` (SQLite + evidence).
+Workspace: **`./.sheaf/`** (SQLite + evidence files).
 
-## Engagement OS features
+## Security notes
 
-- **Lifecycle:** engagement → scope/ROE → assets → runs → evidence → findings → report
-- **Imports:** nuclei JSONL, nmap XML, httpx JSONL, ffuf JSON, Burp issues XML
-- **Report:** GFM markdown → paper HTML (marked + DOMPurify), print CSS, DOCX, package export
-- **Console:** local job console (`bash -lc` over WebSocket on `127.0.0.1` only — not a full PTY; XSS ≈ shell)
-
-See [docs/engagement-os-research.md](docs/engagement-os-research.md) for design notes.
+- Prefer binding to **`127.0.0.1`** only.
+- The **console** can run shell as the API process user. Any XSS in the UI is effectively host shell access — do not expose Sheaf on a network interface.
+- For **authorized** testing, labs, and training only. You own legal scope and ROE.
 
 ## Tests
 
 ```bash
-pnpm test          # unit (importers)
+pnpm test          # unit (core / importers)
 pnpm test:e2e      # build + Playwright Chromium
 pnpm ci            # test + typecheck + build + e2e
 ```
 
-## Production UI
-
-```bash
-pnpm --filter @sheaf/web build
-pnpm sheaf -- serve
-```
-
-Serves API + built UI on `http://127.0.0.1:7420`. Prefer loopback; never expose the console on a network interface.
-
 ## Docs
 
-| File | Description |
-|------|-------------|
+| Doc | What |
+|-----|------|
 | [PRD.md](./PRD.md) | Product requirements |
 | [PLANNING.md](./PLANNING.md) | Architecture |
 | [AGENTS.md](./AGENTS.md) | Contributor / agent guidelines |
 | [TASK.md](./TASK.md) | Task board |
-| [docs/](./docs/) | Design, data model, research |
+| [docs/engagement-os-research.md](./docs/engagement-os-research.md) | Engagement OS research |
+| [docs/data-model.md](./docs/data-model.md) | Data model |
+| [docs/ROADMAP.md](./docs/ROADMAP.md) | Roadmap |
 
 ## Contributing
 
-1. Read [PRD.md](./PRD.md) and [PLANNING.md](./PLANNING.md).
-2. Check [TASK.md](./TASK.md); add work you start.
-3. Follow [AGENTS.md](./AGENTS.md).
-4. Use synthetic fixtures only — never commit real client data.
-5. Prefer small PRs with tests for importers and core logic.
+1. Read [PRD.md](./PRD.md) and [AGENTS.md](./AGENTS.md).
+2. Prefer small PRs with tests for importers and core logic.
+3. Synthetic fixtures only — never commit real client data.
 
 ```bash
-pnpm test
-pnpm --filter @sheaf/web build
+pnpm ci
 ```
 
 ## License
@@ -115,4 +134,4 @@ TBD (lean MIT or Apache-2.0).
 
 ## Responsible use
 
-For authorized security testing, assessments, and lab learning only. You are responsible for legal scope.
+Authorized security testing, assessments, and lab learning only. Misuse is on you.
