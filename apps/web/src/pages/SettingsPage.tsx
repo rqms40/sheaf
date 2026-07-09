@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Check, Settings2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Check, ChevronDown, CircleHelp, Settings2 } from "lucide-react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/sheaf/PageHeader";
 import { SheafMark } from "@/components/sheaf/Logo";
@@ -16,10 +16,67 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+
+/**
+ * Expandable help for a setting — “What this does” (case-room, not a modal maze).
+ */
+function SettingHelp({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const panelId = useId();
+  return (
+    <div className="rounded-md border border-border/80 bg-background/40">
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] text-muted hover:text-foreground"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <CircleHelp className="size-3.5 shrink-0 text-primary/80" />
+        <span className="flex-1 font-medium tracking-wide">
+          {title ?? "What this does"}
+        </span>
+        <ChevronDown
+          className={cn(
+            "size-3.5 shrink-0 text-faint transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open ? (
+        <div
+          id={panelId}
+          className="space-y-2 border-t border-border/60 px-2.5 py-2 text-[12px] leading-relaxed text-muted"
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function HelpList({ items }: { items: string[] }) {
+  return (
+    <ul className="list-disc space-y-1 pl-4">
+      {items.map((t) => (
+        <li key={t}>{t}</li>
+      ))}
+    </ul>
+  );
+}
 
 /**
  * Workspace preferences — active case for wrap/capture, report defaults, density.
- * Design: quiet case-room form, not a SaaS settings labyrinth.
+ * Design: quiet case-room form with progressive disclosure for each option.
  */
 export function SettingsPage() {
   const qc = useQueryClient();
@@ -91,7 +148,7 @@ export function SettingsPage() {
           <PageHeader
             eyebrow="Preferences"
             title="Settings"
-            description="Active casefile for wrap/capture, report defaults, and UI density. Stored in .sheaf/config.json."
+            description="Stored in .sheaf/config.json. Expand “What this does” under each option for examples and side effects."
           />
 
           <Card className="mb-4">
@@ -102,10 +159,6 @@ export function SettingsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-[12px] text-muted">
-                Used by <code className="font-mono text-[11px]">sheaf wrap</code> and in-app
-                Capture when you omit <code className="font-mono text-[11px]">-e</code>.
-              </p>
               <div className="space-y-1.5">
                 <Label>Casefile</Label>
                 <Select
@@ -129,6 +182,22 @@ export function SettingsPage() {
               <p className="text-[11px] text-faint">
                 Current: <span className="text-muted">{activeName}</span>
               </p>
+              <SettingHelp defaultOpen>
+                <p>
+                  <strong className="text-foreground">Default casefile</strong> for tool
+                  capture when you don’t pass an engagement id.
+                </p>
+                <HelpList
+                  items={[
+                    "sheaf wrap -- nmap -sV host → imports into this engagement",
+                    "Console / Capture uses the engagement you opened; CLI wrap uses this when -e is omitted",
+                    "Set to None if you want wrap to require an explicit -e (safer on shared machines)",
+                  ]}
+                />
+                <p className="font-mono text-[11px] text-faint">
+                  CLI: sheaf settings set --active &lt;id&gt;
+                </p>
+              </SettingHelp>
             </CardContent>
           </Card>
 
@@ -136,56 +205,110 @@ export function SettingsPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-[13px]">Capture & report</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <label className="flex cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={autoImport}
-                  onChange={(e) => setAutoImport(e.target.checked)}
-                />
-                <span>
-                  <span className="block text-[13px] text-foreground">
-                    Auto-import on wrap
+            <CardContent className="space-y-5">
+              <div className="space-y-2">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={autoImport}
+                    onChange={(e) => setAutoImport(e.target.checked)}
+                  />
+                  <span>
+                    <span className="block text-[13px] text-foreground">
+                      Auto-import on wrap
+                    </span>
+                    <span className="text-[12px] text-muted">
+                      Inject machine-readable flags and import known tools into the casefile.
+                    </span>
                   </span>
-                  <span className="text-[12px] text-muted">
-                    When wrapping nmap/nuclei/httpx/ffuf/naabu, inject machine-readable
-                    flags and import into the active casefile.
+                </label>
+                <SettingHelp>
+                  <p>
+                    When <strong className="text-foreground">on</strong>, wrap/capture for
+                    known tools (nmap, nuclei, httpx, ffuf, naabu) will:
+                  </p>
+                  <HelpList
+                    items={[
+                      "Add output flags if you didn’t (e.g. nmap -oX, nuclei -jsonl)",
+                      "Save raw output under .sheaf/runs/<engagement>/",
+                      "Parse and create assets / findings on the active case",
+                    ]}
+                  />
+                  <p>
+                    When <strong className="text-foreground">off</strong>, the command still
+                    runs and output is saved, but nothing is imported — useful if you only
+                    want a log file.
+                  </p>
+                  <p className="text-faint">
+                    Authorized targets only. You are responsible for ROE and scope.
+                  </p>
+                </SettingHelp>
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={confirmedOnly}
+                    onChange={(e) => setConfirmedOnly(e.target.checked)}
+                  />
+                  <span>
+                    <span className="block text-[13px] text-foreground">
+                      Default report: confirmed only
+                    </span>
+                    <span className="text-[12px] text-muted">
+                      Report page starts with the “Confirmed only” filter.
+                    </span>
                   </span>
-                </span>
-              </label>
-              <label className="flex cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={confirmedOnly}
-                  onChange={(e) => setConfirmedOnly(e.target.checked)}
-                />
-                <span>
-                  <span className="block text-[13px] text-foreground">
-                    Default report: confirmed only
-                  </span>
-                  <span className="text-[12px] text-muted">
-                    Report page opens with confirmed findings filter when enabled.
-                  </span>
-                </span>
-              </label>
-              <div className="space-y-1.5">
-                <Label>Console default cwd</Label>
-                <Select
-                  value={consoleCwd}
-                  onValueChange={(v) =>
-                    setConsoleCwd(v === "engagement" ? "engagement" : "workspace")
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="workspace">Workspace root</SelectItem>
-                    <SelectItem value="engagement">Engagement evidence folder</SelectItem>
-                  </SelectContent>
-                </Select>
+                </label>
+                <SettingHelp>
+                  <p>
+                    Controls the <strong className="text-foreground">initial filter</strong>{" "}
+                    on the Report page for this workspace (you can still switch in the UI).
+                  </p>
+                  <HelpList
+                    items={[
+                      "On → client-ready draft: only findings marked confirmed",
+                      "Off → all active findings (drafts / needs review included)",
+                      "Does not change finding status or archive anything",
+                    ]}
+                  />
+                </SettingHelp>
+              </div>
+
+              <div className="space-y-2">
+                <div className="space-y-1.5">
+                  <Label>Console default cwd</Label>
+                  <Select
+                    value={consoleCwd}
+                    onValueChange={(v) =>
+                      setConsoleCwd(v === "engagement" ? "engagement" : "workspace")
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="workspace">Workspace root</SelectItem>
+                      <SelectItem value="engagement">Engagement evidence folder</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <SettingHelp>
+                  <p>
+                    Preferred working directory for job-console / capture context (where
+                    relative paths resolve).
+                  </p>
+                  <HelpList
+                    items={[
+                      "Workspace root → the folder that contains .sheaf/ (good for general tools)",
+                      "Engagement evidence folder → under .sheaf/evidence/<id>/ (handy for saving dumps next to the case)",
+                      "Does not change where wrap stores run outputs (always .sheaf/runs/…)",
+                    ]}
+                  />
+                </SettingHelp>
               </div>
             </CardContent>
           </Card>
@@ -194,22 +317,34 @@ export function SettingsPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-[13px]">Interface</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-1.5">
-              <Label>Density</Label>
-              <Select
-                value={density}
-                onValueChange={(v) =>
-                  setDensity(v === "compact" ? "compact" : "comfortable")
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="comfortable">Comfortable</SelectItem>
-                  <SelectItem value="compact">Compact</SelectItem>
-                </SelectContent>
-              </Select>
+            <CardContent className="space-y-2">
+              <div className="space-y-1.5">
+                <Label>Density</Label>
+                <Select
+                  value={density}
+                  onValueChange={(v) =>
+                    setDensity(v === "compact" ? "compact" : "comfortable")
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="comfortable">Comfortable</SelectItem>
+                    <SelectItem value="compact">Compact</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <SettingHelp>
+                <p>UI spacing preference for this workspace.</p>
+                <HelpList
+                  items={[
+                    "Comfortable → default type size and breathing room",
+                    "Compact → slightly denser text for smaller screens or long finding lists",
+                    "Applies after Save (sets data-density on the page)",
+                  ]}
+                />
+              </SettingHelp>
             </CardContent>
           </Card>
 
@@ -227,13 +362,24 @@ export function SettingsPage() {
             </Button>
           </div>
 
-          <pre className="mt-8 overflow-x-auto rounded-md border border-border bg-card p-3 font-mono text-[11px] text-muted">
-            {`# CLI equivalents
-pnpm sheaf -- settings get
+          <details className="mt-8 rounded-md border border-border bg-card open:pb-0">
+            <summary className="cursor-pointer list-none px-3 py-2 text-[12px] text-muted marker:content-none [&::-webkit-details-marker]:hidden">
+              <span className="inline-flex items-center gap-2">
+                <CircleHelp className="size-3.5 text-primary/80" />
+                Advanced: CLI equivalents
+                <ChevronDown className="size-3.5 text-faint" />
+              </span>
+            </summary>
+            <pre className="overflow-x-auto border-t border-border px-3 py-2 font-mono text-[11px] text-muted">
+              {`pnpm sheaf -- settings get
 pnpm sheaf -- settings set --active <engagement-id>
+pnpm sheaf -- settings set --auto-import
+pnpm sheaf -- settings set --no-auto-import
+pnpm sheaf -- settings set --confirmed-only
 pnpm sheaf -- wrap -e <id> -- nmap -sV scanme.nmap.org
 pnpm sheaf -- wrap -- nuclei -u https://example.com   # uses active engagement`}
-          </pre>
+            </pre>
+          </details>
         </div>
       </div>
     </div>
